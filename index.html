@@ -220,6 +220,8 @@ a.tel{color:var(--primary-dark);font-weight:900;text-decoration:none;border-bott
 }
 .input:focus{outline:none;border-color:var(--primary)}
 textarea.input{min-height:64px;resize:vertical}
+.ymd{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px}
+.ymd select{padding:11px 8px;font-size:1rem;text-align:center;text-align-last:center}
 .chk{
   grid-column:1/-1;display:flex;align-items:center;gap:8px;background:var(--alert-bg);
   border:2px solid var(--alert-border);border-radius:8px;padding:8px 11px;
@@ -319,8 +321,7 @@ const SCHEMA = [
   { id:'basic', title:'基本情報', icon:'👤', type:'form', fields:[
     {k:'name',l:'氏名',t:'text',ph:'山田 花子'},
     {k:'kana',l:'ふりがな',t:'text',ph:'やまだ はなこ'},
-    {k:'relation',l:'続柄',t:'text',ph:'母／父／本人'},
-    {k:'birth',l:'生年月日',t:'date'},
+    {k:'birth',l:'生年月日',t:'ymd'},
     {k:'sex',l:'性別',t:'select',opts:['','男性','女性','その他']},
     {k:'blood',l:'血液型',t:'select',opts:['','A型 Rh+','A型 Rh−','B型 Rh+','B型 Rh−','O型 Rh+','O型 Rh−','AB型 Rh+','AB型 Rh−','不明']},
     {k:'height',l:'身長（cm）',t:'number'},
@@ -464,7 +465,7 @@ function loadState(){
     const d = v ? JSON.parse(v) : null;
     if(d && Array.isArray(d.members) && d.members.length) return normalize(d);
   }catch(e){ /* 壊れていたら初期化 */ }
-  return { version:1, members:[ newMember('本人') ] };
+  return { version:1, members:[ newMember() ] };
 }
 function normalize(d){
   d.members.forEach(m => {
@@ -478,11 +479,10 @@ function normalize(d){
   });
   return d;
 }
-function newMember(relation){
+function newMember(){
   const m = { id:uid(), updatedAt:'', none:{}, medPhotos:[] };
   SCHEMA.forEach(s => { m[s.id] = s.type === 'list' ? [] : {}; });
   m.basic.name = '';
-  m.basic.relation = relation || '';
   return m;
 }
 function cur(){ return state.members.find(m => m.id === curId) || state.members[0]; }
@@ -532,7 +532,7 @@ function nonEmpty(obj, keys){
 function renderChips(){
   const el = document.getElementById('chips');
   const html = state.members.map(m => {
-    const label = (m.basic.name || '名前未入力') + (m.basic.relation ? '（'+m.basic.relation+'）' : '');
+    const label = m.basic.name || '名前未入力';
     return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
   }).join('');
   el.innerHTML = html + '<button class="chip add" id="chipAdd" aria-label="家族を追加">＋ 家族を追加</button>';
@@ -550,7 +550,6 @@ function renderCard(){
 
   /* --- 氏名ヘッダー --- */
   const meta = [];
-  if(b.relation) meta.push(esc(b.relation));
   if(age(b.birth)) meta.push('<b>'+age(b.birth)+'</b>');
   if(b.sex) meta.push(esc(b.sex));
   if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
@@ -747,9 +746,44 @@ function renderCard(){
 }
 
 /* ===================== 編集画面 ===================== */
+/* 年・月・日をそれぞれドラムで選ぶ入力 */
+function parseYMD(v){
+  const mt = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(v||''));
+  return mt ? { y:+mt[1], m:+mt[2], d:+mt[3] } : { y:'', m:'', d:'' };
+}
+function daysInMonth(y, m){
+  if(!m) return 31;
+  return new Date(y || 2024, m, 0).getDate();
+}
+function ymdHTML(sec, f, val, idx, id, dataAttr){
+  const c = parseYMD(val);
+  const thisYear = new Date().getFullYear();
+  let ys = '<option value="">年</option>';
+  for(let y = thisYear; y >= thisYear - 120; y--){
+    ys += '<option value="'+y+'"'+(c.y === y ? ' selected' : '')+'>'+y+'年</option>';
+  }
+  let ms = '<option value="">月</option>';
+  for(let m = 1; m <= 12; m++){
+    ms += '<option value="'+m+'"'+(c.m === m ? ' selected' : '')+'>'+m+'月</option>';
+  }
+  let ds = '<option value="">日</option>';
+  const dim = daysInMonth(c.y, c.m);
+  for(let d = 1; d <= dim; d++){
+    ds += '<option value="'+d+'"'+(c.d === d ? ' selected' : '')+'>'+d+'日</option>';
+  }
+  const sel = (part, opts) =>
+    '<select class="input" '+dataAttr+' data-ymd="'+part+'" aria-label="'+esc(f.l)+'の'+
+    (part==='y'?'年':part==='m'?'月':'日')+'">'+opts+'</select>';
+  return '<div class="f full"><label id="'+id+'_lbl">'+esc(f.l)+'</label>'+
+    '<div class="ymd" role="group" aria-labelledby="'+id+'_lbl">'+
+      sel('y', ys) + sel('m', ms) + sel('d', ds) +
+    '</div></div>';
+}
+
 function fieldHTML(sec, f, val, idx){
   const id = 'f_'+sec+'_'+f.k+(idx!=null?'_'+idx:'');
   const dataAttr = 'data-sec="'+esc(sec)+'" data-k="'+esc(f.k)+'"'+(idx!=null?' data-i="'+idx+'"':'');
+  if(f.t === 'ymd') return ymdHTML(sec, f, val, idx, id, dataAttr);
   if(f.t === 'check'){
     return '<div class="chk"><input type="checkbox" id="'+id+'" '+dataAttr+(val?' checked':'')+'>'+
            '<label for="'+id+'">'+esc(f.l)+'</label></div>';
@@ -880,7 +914,7 @@ function renderEditor(){
 document.getElementById('chips').addEventListener('click', e => {
   const add = e.target.closest('#chipAdd');
   if(add){
-    const m = newMember('');
+    const m = newMember();
     state.members.push(m);
     curId = m.id;
     save(); renderAll(); showSection('sec-edit');
@@ -899,7 +933,28 @@ function onEdit(e){
   const sec = t.dataset.sec, k = t.dataset.k;
   if(!sec || !k) return;
   const m = cur();
-  const val = (t.type === 'checkbox') ? t.checked : t.value;
+  let val = (t.type === 'checkbox') ? t.checked : t.value;
+
+  /* 年・月・日の3つから生年月日を組み立てる */
+  if(t.dataset.ymd){
+    const group = t.closest('.ymd');
+    const get = part => group.querySelector('[data-ymd="'+part+'"]').value;
+    const y = get('y'), mo = get('m');
+    if(t.dataset.ymd !== 'd'){
+      /* 月末の日数に合わせて「日」の選択肢を作り直す */
+      const dSel = group.querySelector('[data-ymd="d"]');
+      const keep = dSel.value;
+      const dim = daysInMonth(y, Number(mo));
+      let ds = '<option value="">日</option>';
+      for(let d = 1; d <= dim; d++) ds += '<option value="'+d+'">'+d+'日</option>';
+      dSel.innerHTML = ds;
+      dSel.value = (keep && Number(keep) <= dim) ? keep : '';
+    }
+    const d = get('d');
+    const p2 = n => String(n).padStart(2, '0');
+    val = (y && mo && d) ? (y + '-' + p2(mo) + '-' + p2(d)) : '';
+  }
+
   if(t.dataset.i != null){
     const i = Number(t.dataset.i);
     if(!m[sec][i]) return;
@@ -908,7 +963,7 @@ function onEdit(e){
     m[sec][k] = val;
   }
   touch();
-  if(sec === 'basic' && (k === 'name' || k === 'relation')) renderChips();
+  if(sec === 'basic' && k === 'name') renderChips();
   if(sec === 'none'){ renderEditor(); reopen(k); }
   clearTimeout(onEdit._t);
   onEdit._t = setTimeout(() => showToast('保存しました'), 600);
