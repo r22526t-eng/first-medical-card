@@ -1088,12 +1088,17 @@ let syncing = false;
 function forServer(st){
   return {
     version: 1,
-    members: (st.members || []).map(m => {
+    members: (st.members || []).filter(m => !isUntouched(m)).map(m => {
       const c = {};
       for(const k in m){ if(k !== 'medPhotos') c[k] = m[k]; }
       return c;
     })
   };
+}
+
+/* 一度も触っていない空の枠（初回起動時の1人）は共有しない */
+function isUntouched(m){
+  return !m.updatedAt && !((m.basic || {}).name || '').trim();
 }
 
 /* 同じ人は「更新が新しい方」を採用して突き合わせる */
@@ -1110,11 +1115,13 @@ function mergeStates(local, server){
     if(Array.isArray(m.medPhotos) && m.medPhotos.length) localPhotos[m.id] = m.medPhotos;
   });
 
-  const members = Object.keys(byId).map(id => {
+  let members = Object.keys(byId).map(id => {
     const m = Object.assign({}, byId[id]);
     if(!Array.isArray(m.medPhotos) || !m.medPhotos.length) m.medPhotos = localPhotos[id] || [];
     return m;
   });
+  const touched = members.filter(m => !isUntouched(m));
+  if(touched.length) members = touched;
   return { version: 1, members: members };
 }
 
