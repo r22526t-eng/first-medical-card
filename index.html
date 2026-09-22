@@ -287,6 +287,7 @@ textarea.input{min-height:64px;resize:vertical}
       <button class="btn ghost sm" id="btnEdit">✏️ 編集</button>
       <button class="btn ghost sm" id="btnFont">🔍 文字を大きく</button>
       <button class="btn ghost sm" id="btnPrint">🖨 印刷</button>
+      <button class="btn ghost sm" id="btnSync" hidden>🔄 同期</button>
     </div>
     <div class="card" id="card" aria-live="polite"></div>
   </div>
@@ -297,6 +298,21 @@ textarea.input{min-height:64px;resize:vertical}
       入力した内容は<b>この端末のブラウザの中だけ</b>に保存されます（外部には一切送信されません）。
       入力はそのつど自動保存され、「保存」でカード画面にもどります。
     </div>
+    <details class="acc" id="syncBox">
+      <summary>☁️ 家族と共有<span class="cnt zero" id="syncBadge">未設定</span></summary>
+      <div class="accbody">
+        <div class="f full">
+          <label for="passInput">家族の合言葉</label>
+          <input class="input" id="passInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="例）nada-0000-0000">
+        </div>
+        <div class="toolbar" style="margin:10px 0 0">
+          <button class="btn sm" id="btnSyncOn">この端末で共有をはじめる</button>
+          <button class="btn danger sm" id="btnSyncOff" hidden>共有をやめる</button>
+        </div>
+        <p class="hint" id="syncInfo">同じ合言葉を入れた家族の端末どうしで、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。</p>
+      </div>
+    </details>
+
     <div id="editor"></div>
     <div class="toolbar">
       <button class="btn grow" id="btnSave">✓ 保存</button>
@@ -485,7 +501,11 @@ function newMember(){
   m.basic.name = '';
   return m;
 }
-function cur(){ return state.members.find(m => m.id === curId) || state.members[0]; }
+function liveMembers(){ return state.members.filter(m => !m.deleted); }
+function cur(){
+  const live = liveMembers();
+  return live.find(m => m.id === curId) || live[0] || state.members[0];
+}
 function touch(){
   const m = cur();
   if(m) m.updatedAt = formatDate();
@@ -531,7 +551,7 @@ function nonEmpty(obj, keys){
 /* ===================== メンバータブ ===================== */
 function renderChips(){
   const el = document.getElementById('chips');
-  const html = state.members.map(m => {
+  const html = liveMembers().map(m => {
     const label = m.basic.name || '名前未入力';
     return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
   }).join('');
@@ -1028,6 +1048,7 @@ document.getElementById('btnEdit').onclick = () => { renderEditor(); showSection
 document.getElementById('btnSave').onclick = () => {
   save(); renderAll(); showSection('sec-card');
   showToast('保存しました');
+  syncNow(true);
 };
 document.getElementById('btnPrint').onclick = () => window.print();
 document.getElementById('btnFont').onclick = e => {
@@ -1037,21 +1058,156 @@ document.getElementById('btnFont').onclick = e => {
 };
 
 document.getElementById('btnDelMember').onclick = () => {
-  if(state.members.length <= 1){ showToast('最後の1人は削除できません'); return; }
+  if(liveMembers().length <= 1){ showToast('最後の1人は削除できません'); return; }
   const m = cur();
   if(confirm('「'+(m.basic.name||'名前未入力')+'」のデータをすべて削除します。よろしいですか？')){
-    state.members = state.members.filter(x => x.id !== m.id);
-    curId = state.members[0].id;
-    save(); renderAll(); renderEditor(); showSection('sec-card');
+    m.deleted = true;                 /* 共有先の端末にも削除が伝わるようにする */
+    m.updatedAt = formatDate();
+    m.medPhotos = [];
+    save();
+    curId = (liveMembers()[0] || {}).id;
+    renderAll(); renderEditor(); showSection('sec-card');
     showToast('削除しました');
+    syncNow(true);
   }
 };
+
+/* ===================== 家族との共有 ===================== */
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxJJSCuXZ1u39WQfjr-BihBztrbQY2lLosWRmZMbH6EE1Y02ap0gezvnXFMamfYTHeE/exec';
+const PASS_KEY = 'famcard_pass';
+const SYNCAT_KEY = 'famcard_synced_at';
+
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
+let syncPass = lsGet(PASS_KEY) || '';
+let syncing = false;
+
+/* 写真は通信量が大きいため共有しない（撮った端末にだけ残す） */
+function forServer(st){
+  return {
+    version: 1,
+    members: (st.members || []).map(m => {
+      const c = {};
+      for(const k in m){ if(k !== 'medPhotos') c[k] = m[k]; }
+      return c;
+    })
+  };
+}
+
+/* 同じ人は「更新が新しい方」を採用して突き合わせる */
+function mergeStates(local, server){
+  const byId = {};
+  ((server && server.members) || []).forEach(m => { if(m && m.id) byId[m.id] = m; });
+  (local.members || []).forEach(m => {
+    const s = byId[m.id];
+    if(!s || String(m.updatedAt || '') > String(s.updatedAt || '')) byId[m.id] = m;
+  });
+
+  const localPhotos = {};
+  (local.members || []).forEach(m => {
+    if(Array.isArray(m.medPhotos) && m.medPhotos.length) localPhotos[m.id] = m.medPhotos;
+  });
+
+  const members = Object.keys(byId).map(id => {
+    const m = Object.assign({}, byId[id]);
+    if(!Array.isArray(m.medPhotos) || !m.medPhotos.length) m.medPhotos = localPhotos[id] || [];
+    return m;
+  });
+  return { version: 1, members: members };
+}
+
+async function syncNow(silent){
+  if(!syncPass || syncing) return false;
+  if(!navigator.onLine){
+    if(!silent) showToast('オフラインのため同期できません');
+    return false;
+  }
+  syncing = true;
+  const btn = document.getElementById('btnSync');
+  if(btn) btn.textContent = '🔄 同期中…';
+  try{
+    const res = await fetch(SYNC_URL + '?action=load&pass=' + encodeURIComponent(syncPass))
+      .then(r => r.json());
+    if(!res.ok){
+      showToast(res.error === 'bad_pass' ? '合言葉が違います' : '同期できませんでした');
+      return false;
+    }
+    if(res.payload){
+      state = normalize(mergeStates(state, res.payload));
+      if(!liveMembers().length) state.members.push(newMember());
+      curId = (cur() || {}).id;
+      save();
+    }
+    const push = await fetch(SYNC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'save', pass: syncPass, payload: forServer(state) })
+    }).then(r => r.json());
+
+    if(!push.ok){
+      showToast(push.error === 'too_big' ? '内容が大きすぎて共有できません' : '同期できませんでした');
+      return false;
+    }
+    lsSet(SYNCAT_KEY, formatDate());
+    renderAll();
+    if(!silent) showToast('同期しました');
+    return true;
+  }catch(e){
+    if(!silent) showToast('同期できませんでした（通信エラー）');
+    return false;
+  }finally{
+    syncing = false;
+    if(btn) btn.textContent = '🔄 同期';
+    renderSyncUI();
+  }
+}
+
+function renderSyncUI(){
+  const on = !!syncPass;
+  document.getElementById('btnSync').hidden = !on;
+  document.getElementById('btnSyncOff').hidden = !on;
+  document.getElementById('btnSyncOn').textContent = on ? '合言葉を入れ直す' : 'この端末で共有をはじめる';
+  document.getElementById('passInput').value = syncPass;
+  const badge = document.getElementById('syncBadge');
+  badge.textContent = on ? '共有中' : '未設定';
+  badge.className = on ? 'cnt' : 'cnt zero';
+  const at = lsGet(SYNCAT_KEY);
+  document.getElementById('syncInfo').innerHTML = on
+    ? '共有中です。' + (at ? '最終同期：' + esc(at) : 'まだ同期していません') +
+      '<br>同じ合言葉を入れた家族の端末と、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。'
+    : '同じ合言葉を入れた家族の端末どうしで、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。';
+}
+
+document.getElementById('btnSyncOn').onclick = async () => {
+  const v = document.getElementById('passInput').value.trim();
+  if(!v){ showToast('合言葉を入れてください'); return; }
+  syncPass = v;
+  const ok = await syncNow(false);
+  if(ok){ lsSet(PASS_KEY, v); }
+  else if(!lsGet(PASS_KEY)){ syncPass = ''; }
+  renderSyncUI();
+};
+
+document.getElementById('btnSyncOff').onclick = () => {
+  if(!confirm('この端末での共有をやめます。カードの内容はこの端末に残ります。')) return;
+  syncPass = '';
+  lsDel(PASS_KEY); lsDel(SYNCAT_KEY);
+  renderSyncUI();
+  showToast('共有をやめました');
+};
+
+document.getElementById('btnSync').onclick = () => syncNow(false);
+window.addEventListener('online', () => syncNow(true));
 
 /* ===================== 初期化 ===================== */
 function renderAll(){ renderChips(); renderCard(); }
 storageOK = checkStorage();
 if(!storageOK) document.getElementById('storageWarn').hidden = false;
 renderAll();
+renderSyncUI();
+if(syncPass) syncNow(true);
 
 /* オフラインでも開けるようにする（ホーム画面アプリ用） */
 if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
