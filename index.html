@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>家族の医療カード</title>
+<meta name="theme-color" content="#7c9a6d">
+<meta name="description" content="急な受診・救急搬送のときに見せる、家族の病歴・意向・内服薬のカード">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="医療カード">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap');
 
@@ -38,13 +47,13 @@ body{
   line-height:1.6;
   -webkit-text-size-adjust:100%;
 }
-.wrap{max-width:560px;margin:0 auto;padding:0 14px 96px}
+.wrap{max-width:560px;margin:0 auto;padding:0 14px calc(96px + env(safe-area-inset-bottom))}
 
 /* ===== ヘッダー ===== */
 header{
   background:var(--primary);
   color:#fff;
-  padding:14px 14px 10px;
+  padding:calc(14px + env(safe-area-inset-top)) 14px 10px;
   position:sticky;top:0;z-index:50;
   box-shadow:0 2px 8px rgba(0,0,0,.12);
 }
@@ -988,6 +997,13 @@ function renderAll(){ renderChips(); renderCard(); }
 storageOK = checkStorage();
 if(!storageOK) document.getElementById('storageWarn').hidden = false;
 renderAll();
+
+/* オフラインでも開けるようにする（ホーム画面アプリ用） */
+if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>

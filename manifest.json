@@ -1,0 +1,17 @@
+{
+  "name": "家族の医療カード",
+  "short_name": "医療カード",
+  "description": "急な受診・救急搬送のときに見せる、家族の病歴・意向・内服薬のカード",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8f5f0",
+  "theme_color": "#7c9a6d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
