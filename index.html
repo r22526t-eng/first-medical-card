@@ -103,7 +103,13 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
   background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);
   padding:18px 16px;font-size:var(--card-fs);
 }
-.card .pname{font-size:1.65em;font-weight:900;line-height:1.25;margin:0}
+.card .pname{
+  font-size:1.65em;font-weight:900;line-height:1.25;margin:0;
+  cursor:pointer;border-radius:8px;padding:2px 6px;margin-left:-6px;
+  transition:background .15s;
+}
+.card .pname:hover,.card .pname:focus{background:var(--bg);outline:none}
+.card .pname .editmark{font-size:.5em;margin-left:8px;opacity:.5;vertical-align:middle}
 .card .pmeta{margin:4px 0 0;font-size:.92em;color:var(--text-muted);font-weight:500}
 .card .pmeta b{color:var(--text);font-weight:700}
 .card .updated{margin-top:14px;font-size:.78em;color:var(--text-muted);text-align:right}
@@ -383,6 +389,7 @@ const SCHEMA = [
     {k:'values',l:'本人が大切にしていること',t:'area',full:true,ph:'例）痛みや苦しみがないことを一番に望んでいる'},
     {k:'talkedAt',l:'話し合った日・同席者',t:'text',full:true,ph:'2026年3月 本人・長女・主治医'}
   ]},
+  { id:'vitals', title:'血圧手帳（日々の記録）', icon:'📈', type:'vitals', fields:[] },
   { id:'contacts', title:'連絡先（かかりつけ・家族）', icon:'📞', type:'list', unit:'連絡先', fields:[
     {k:'kind',l:'区分',t:'select',opts:['家族','かかりつけ医','専門病院','訪問看護','ケアマネジャー','調剤薬局','その他']},
     {k:'name',l:'名称・氏名',t:'text'},
@@ -488,16 +495,17 @@ function normalize(d){
     if(!m.id) m.id = uid();
     if(!m.none || typeof m.none !== 'object') m.none = {};
     if(!Array.isArray(m.medPhotos)) m.medPhotos = [];
+    if(!Array.isArray(m.vitals)) m.vitals = [];
     SCHEMA.forEach(s => {
-      if(s.type === 'list'){ if(!Array.isArray(m[s.id])) m[s.id] = []; }
+      if(s.type === 'list' || s.type === 'vitals'){ if(!Array.isArray(m[s.id])) m[s.id] = []; }
       else if(!m[s.id] || typeof m[s.id] !== 'object'){ m[s.id] = {}; }
     });
   });
   return d;
 }
 function newMember(){
-  const m = { id:uid(), updatedAt:'', none:{}, medPhotos:[] };
-  SCHEMA.forEach(s => { m[s.id] = s.type === 'list' ? [] : {}; });
+  const m = { id:uid(), updatedAt:'', none:{}, medPhotos:[], vitals:[] };
+  SCHEMA.forEach(s => { m[s.id] = (s.type === 'list' || s.type === 'vitals') ? [] : {}; });
   m.basic.name = '';
   return m;
 }
@@ -573,7 +581,8 @@ function renderCard(){
   if(age(b.birth)) meta.push('<b>'+age(b.birth)+'</b>');
   if(b.sex) meta.push(esc(b.sex));
   if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
-  h += '<p class="pname">'+esc(b.name || '（氏名未入力）')+'</p>';
+  h += '<p class="pname" data-editname tabindex="0" role="button" aria-label="名前や内容を編集する">'+
+       esc(b.name || '（氏名未入力）')+'<span class="editmark">✏️</span></p>';
   if(b.kana) h += '<p class="pmeta">'+esc(b.kana)+'</p>';
   h += '<p class="pmeta">'+meta.join(' ・ ')+'</p>';
   if(b.birth) h += '<p class="pmeta">生年月日 '+esc(jpDate(b.birth))+'</p>';
@@ -666,6 +675,22 @@ function renderCard(){
       ).join('') + '</div></section>';
   }else if(medsNone){
     h += '<section class="cblock"><h3>💊 内服薬</h3><div class="okmsg">なし（確認済み）</div></section>';
+  }
+
+  /* --- 血圧手帳（直近の記録） --- */
+  const vs = m.vitals || [];
+  if(vs.length){
+    h += '<section class="cblock"><h3>📈 最近の記録（血圧手帳）</h3>' +
+      '<div class="hero">' + esc(vitalWhen(vs[0])) + '　' + vitalLine(vs[0]) + '</div>' +
+      (vs[0].note ? '<div class="none">' + esc(vs[0].note) + '</div>' : '') +
+      (vs.length > 1
+        ? '<div class="rows" style="margin-top:8px">' + vs.slice(1, 6).map(v =>
+            '<div class="row"><div class="t">' + esc(vitalWhen(v)) + '　' + vitalLine(v) + '</div>' +
+            (v.note ? '<div class="s">' + esc(v.note) + '</div>' : '') + '</div>'
+          ).join('') + '</div>'
+        : '') +
+      (vs.length > 6 ? '<div class="none" style="margin-top:6px">ほか ' + (vs.length - 6) + ' 件</div>' : '') +
+      '</section>';
   }
 
   /* --- お薬手帳の写真 --- */
@@ -822,6 +847,87 @@ function fieldHTML(sec, f, val, idx){
   return '<div class="f'+(f.full?' full':'')+'"><label for="'+id+'">'+esc(f.l)+'</label>'+inner+'</div>';
 }
 
+/* ===== 血圧手帳 ===== */
+const MAX_VITALS = 200;   /* 1人あたりの記録件数の上限（古いものから消えます） */
+
+function vitalLine(v){
+  const parts = [];
+  if(v.sbp || v.dbp) parts.push('<b>' + esc(v.sbp || '—') + '/' + esc(v.dbp || '—') + '</b>');
+  if(v.pulse)  parts.push('脈 ' + esc(v.pulse));
+  if(v.temp)   parts.push(esc(v.temp) + '℃');
+  if(v.spo2)   parts.push('SpO2 ' + esc(v.spo2) + '%');
+  if(v.weight) parts.push(esc(v.weight) + 'kg');
+  return parts.join('　');
+}
+function vitalWhen(v){
+  const mt = /^(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2}:\d{2})?/.exec(String(v.at || ''));
+  if(!mt) return String(v.at || '');
+  return Number(mt[2]) + '/' + Number(mt[3]) + (mt[4] ? ' ' + mt[4] : '');
+}
+
+function vitalsEditorHTML(m){
+  const vs = m.vitals || [];
+  const now = new Date();
+  const p2 = n => String(n).padStart(2, '0');
+  const today = now.getFullYear() + '-' + p2(now.getMonth()+1) + '-' + p2(now.getDate());
+  const hhmm = p2(now.getHours()) + ':' + p2(now.getMinutes());
+
+  const num = (id, label, ph, step) =>
+    '<div class="f"><label for="'+id+'">'+esc(label)+'</label>'+
+    '<input class="input" type="number" inputmode="'+(step?'decimal':'numeric')+'"'+
+    (step ? ' step="'+step+'"' : '')+' id="'+id+'" placeholder="'+esc(ph)+'"></div>';
+
+  return '<div class="fgrid">' +
+    '<div class="f"><label for="v_date">日付</label><input class="input" type="date" id="v_date" value="'+today+'"></div>' +
+    '<div class="f"><label for="v_time">時刻</label><input class="input" type="time" id="v_time" value="'+hhmm+'"></div>' +
+    num('v_sbp', '上の血圧', '128') +
+    num('v_dbp', '下の血圧', '76') +
+    num('v_pulse', '脈拍', '72') +
+    num('v_temp', '体温（℃）', '36.4', '0.1') +
+    num('v_weight', '体重（kg）', '52.0', '0.1') +
+    num('v_spo2', 'SpO2（%）', '97') +
+    '<div class="f full"><label for="v_note">メモ</label>' +
+      '<input class="input" type="text" id="v_note" placeholder="めまいあり／内服後　など"></div>' +
+    '<div class="f full"><button class="btn" id="btnAddVital">＋ この内容で記録する</button></div>' +
+  '</div>' +
+  '<div class="photobox">' +
+    '<div class="photolabel">これまでの記録（' + vs.length + '件）</div>' +
+    (vs.length
+      ? '<div class="rows">' + vs.map((v, i) =>
+          '<div class="row"><div class="t">' + esc(vitalWhen(v)) + '　' + vitalLine(v) +
+          '<button class="btn danger sm" data-delvital="' + i + '" style="float:right">削除</button></div>' +
+          (v.note ? '<div class="s">' + esc(v.note) + '</div>' : '') + '</div>'
+        ).join('') + '</div>'
+      : '<p class="empty">まだ記録がありません</p>') +
+    '<p class="hint">血圧・体温・体重などを毎日つけておくと、受診時に「普段との違い」を医師に伝えられます。記録は家族と共有されます。</p>' +
+  '</div>';
+}
+
+function addVital(){
+  const val = id => (document.getElementById(id).value || '').trim();
+  const date = val('v_date'), time = val('v_time');
+  const rec = {
+    at: (date || '') + (time ? 'T' + time : ''),
+    sbp: val('v_sbp'), dbp: val('v_dbp'), pulse: val('v_pulse'),
+    temp: val('v_temp'), weight: val('v_weight'), spo2: val('v_spo2'),
+    note: val('v_note')
+  };
+  if(!date){ showToast('日付を入れてください'); return; }
+  if(!rec.sbp && !rec.dbp && !rec.pulse && !rec.temp && !rec.weight && !rec.spo2 && !rec.note){
+    showToast('記録する内容を1つ以上入れてください');
+    return;
+  }
+  const m = cur();
+  m.vitals.unshift(rec);
+  m.vitals.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  let trimmed = false;
+  if(m.vitals.length > MAX_VITALS){ m.vitals.length = MAX_VITALS; trimmed = true; }
+  touch();
+  renderEditor(); reopen('vitals');
+  showToast(trimmed ? '記録しました（古い記録は削除されました）' : '記録しました');
+  syncNow(true);
+}
+
 /* ===== お薬手帳の写真 ===== */
 const MAX_PHOTOS = 8;
 
@@ -903,7 +1009,9 @@ function renderEditor(){
 
   el.innerHTML = SCHEMA.map(s => {
     let body;
-    if(s.type === 'form'){
+    if(s.type === 'vitals'){
+      body = vitalsEditorHTML(m);
+    }else if(s.type === 'form'){
       body = '<div class="fgrid">' + s.fields.map(f => fieldHTML(s.id, f, (m[s.id]||{})[f.k])).join('') + '</div>';
     }else{
       const arr = m[s.id] || [];
@@ -921,7 +1029,9 @@ function renderEditor(){
       body = noneChk + (isNone ? '<p class="empty">カードには「なし（確認済み）」と表示されます。</p>' : list)
            + (s.photos ? photoEditorHTML(m) : '');
     }
-    const cnt = s.type !== 'list' ? ''
+    const cnt = s.type === 'vitals'
+      ? ((m.vitals||[]).length ? '<span class="cnt">'+m.vitals.length+'</span>' : '')
+      : s.type !== 'list' ? ''
       : ((m.none||{})[s.id] ? '<span class="cnt zero">なし</span>'
         : ((m[s.id]||[]).length ? '<span class="cnt">'+(m[s.id].length)+'</span>' : ''));
     const open = (s.id === 'basic') ? ' open' : '';
@@ -998,6 +1108,17 @@ document.getElementById('editor').addEventListener('change', e => {
 });
 
 document.getElementById('editor').addEventListener('click', e => {
+  if(e.target.closest('#btnAddVital')){ addVital(); return; }
+  const delVital = e.target.closest('[data-delvital]');
+  if(delVital){
+    if(confirm('この記録を削除します。よろしいですか？')){
+      cur().vitals.splice(Number(delVital.dataset.delvital), 1);
+      touch(); renderEditor(); reopen('vitals');
+      showToast('削除しました');
+      syncNow(true);
+    }
+    return;
+  }
   if(e.target.closest('#btnAddPhoto')){
     document.getElementById('photoInput').click();
     return;
@@ -1041,8 +1162,26 @@ function reopen(sec){
 
 document.getElementById('card').addEventListener('click', e => {
   const img = e.target.closest('[data-zoom]');
-  if(img) openLightbox(img.src);
+  if(img){ openLightbox(img.src); return; }
+  if(e.target.closest('[data-editname]')) openEditor('basic', 'f_basic_name');
 });
+document.getElementById('card').addEventListener('keydown', e => {
+  if((e.key === 'Enter' || e.key === ' ') && e.target.closest('[data-editname]')){
+    e.preventDefault();
+    openEditor('basic', 'f_basic_name');
+  }
+});
+
+/* 編集画面を開き、指定の項目まで移動する */
+function openEditor(sectionId, focusId){
+  renderEditor();
+  showSection('sec-edit');
+  if(sectionId) reopen(sectionId);
+  if(focusId){
+    const el = document.getElementById(focusId);
+    if(el){ el.focus(); el.select && el.select(); }
+  }
+}
 
 document.getElementById('btnEdit').onclick = () => { renderEditor(); showSection('sec-edit'); };
 document.getElementById('btnSave').onclick = () => {
