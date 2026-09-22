@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>家族の医療カード</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap');
+
+:root{
+  --font:'Zen Kaku Gothic New','Noto Sans JP',sans-serif;
+  --bg:#f8f5f0;
+  --surface:#fffef9;
+  --primary:#7c9a6d;
+  --primary-dark:#6a8560;
+  --secondary:#d4a96a;
+  --text:#3d3530;
+  --text-muted:#8c7b72;
+  --border:#e8ddd5;
+  --radius:16px;
+  --shadow:0 2px 10px rgba(0,0,0,.06);
+  --alert:#c0392b;
+  --alert-bg:#fdecea;
+  --alert-border:#e8b4ae;
+  --warn:#b7791f;
+  --warn-bg:#fdf6e3;
+  --warn-border:#e8d6a8;
+  --card-fs:1rem;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 14px 96px}
+
+/* ===== ヘッダー ===== */
+header{
+  background:var(--primary);
+  color:#fff;
+  padding:14px 14px 10px;
+  position:sticky;top:0;z-index:50;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+header .hinner{max-width:560px;margin:0 auto}
+header h1{margin:0;font-size:1.05rem;font-weight:900;letter-spacing:.02em}
+header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
+
+.swarn{
+  background:var(--alert);color:#fff;padding:10px 14px;font-size:.82rem;font-weight:700;
+  line-height:1.5;text-align:center;
+}
+.swarn[hidden]{display:none}
+
+/* ===== メンバータブ ===== */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;-webkit-overflow-scrolling:touch}
+.chip{
+  flex:0 0 auto;padding:8px 16px;border-radius:999px;border:2px solid var(--border);
+  background:var(--surface);color:var(--text-muted);font-family:inherit;font-size:.9rem;
+  font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.chip.add{border-style:dashed;color:var(--primary);font-weight:700}
+
+/* ===== ツールバー ===== */
+.toolbar{display:flex;gap:8px;margin:10px 0 16px;flex-wrap:wrap}
+.btn{
+  padding:11px 18px;border:none;border-radius:var(--radius);background:var(--primary);color:#fff;
+  font-family:inherit;font-size:.92rem;font-weight:700;cursor:pointer;
+  transition:background .2s,transform .1s;
+}
+.btn:hover{background:var(--primary-dark)}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:var(--surface);color:var(--text);border:2px solid var(--border)}
+.btn.ghost:hover{background:var(--bg)}
+.btn.danger{background:var(--alert)}
+.btn.danger:hover{background:#a33125}
+.btn.sm{padding:7px 13px;font-size:.82rem}
+.btn.grow{flex:1}
+
+/* ===== セクション切替 ===== */
+.section{display:none}
+.section.active{display:block}
+
+/* ===== 救急カード ===== */
+.card{
+  background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:18px 16px;font-size:var(--card-fs);
+}
+.card .pname{font-size:1.65em;font-weight:900;line-height:1.25;margin:0}
+.card .pmeta{margin:4px 0 0;font-size:.92em;color:var(--text-muted);font-weight:500}
+.card .pmeta b{color:var(--text);font-weight:700}
+.card .updated{margin-top:14px;font-size:.78em;color:var(--text-muted);text-align:right}
+
+.cblock{margin-top:16px;border-top:2px solid var(--border);padding-top:12px}
+.cblock:first-of-type{border-top:none}
+.cblock h3{
+  margin:0 0 8px;font-size:.88em;font-weight:900;letter-spacing:.04em;
+  color:var(--text-muted);display:flex;align-items:center;gap:6px;
+}
+.cblock.alert{
+  border:3px solid var(--alert);background:var(--alert-bg);border-radius:12px;
+  padding:12px;margin-top:12px;
+}
+.cblock.alert h3{color:var(--alert);font-size:1em}
+.cblock.warn{
+  border:3px solid var(--warn-border);background:var(--warn-bg);border-radius:12px;
+  padding:12px;margin-top:12px;
+}
+.cblock.warn h3{color:var(--warn);font-size:1em}
+.cblock.ok{
+  border:3px solid var(--primary);background:#f1f6ee;border-radius:12px;
+  padding:12px;margin-top:12px;
+}
+.cblock.ok h3{color:var(--primary-dark);font-size:1em}
+.hero{font-size:1.15em;font-weight:900;line-height:1.5}
+.none{color:var(--text-muted);font-weight:500;font-size:.95em}
+.okmsg{font-weight:900;font-size:1.08em;color:var(--primary-dark)}
+.unknown{font-weight:900;font-size:1.02em;color:var(--alert)}
+
+.rows{display:flex;flex-direction:column;gap:7px}
+.row{
+  background:var(--bg);border-radius:9px;padding:9px 11px;
+  border-left:5px solid var(--primary);
+}
+.cblock.alert .row{background:#fff;border-left-color:var(--alert)}
+.cblock.warn .row{background:#fff;border-left-color:var(--warn)}
+.row .t{font-weight:900;font-size:1.02em;line-height:1.35}
+.row .s{font-size:.86em;color:var(--text-muted);margin-top:2px;line-height:1.5}
+.row .tag{
+  display:inline-block;background:var(--alert);color:#fff;font-size:.72em;font-weight:900;
+  padding:1px 8px;border-radius:999px;margin-left:6px;vertical-align:2px;
+}
+.row .tag.g{background:var(--primary)}
+.row .tag.y{background:var(--warn)}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:.95em}
+.kv dt{color:var(--text-muted);font-weight:500;white-space:nowrap}
+.kv dd{margin:0;font-weight:700}
+.kv dd.no{font-weight:500;color:var(--text-muted)}
+.acpgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.acpitem{background:#fff;border-radius:9px;padding:7px 10px;border:1px solid var(--warn-border)}
+.acpitem .l{font-size:.78em;color:var(--text-muted)}
+.acpitem .v{font-weight:900;font-size:1em;line-height:1.3}
+.acpitem .v.yes{color:var(--primary-dark)}
+.acpitem .v.no{color:var(--alert)}
+a.tel{color:var(--primary-dark);font-weight:900;text-decoration:none;border-bottom:2px solid var(--border)}
+
+/* ===== お薬手帳の写真 ===== */
+.cardphotos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cardphotos img{
+  width:100%;height:auto;max-height:300px;object-fit:contain;background:#f2f2f2;
+  border:1px solid var(--border);border-radius:9px;cursor:zoom-in;display:block;
+}
+.photobox{border-top:2px dashed var(--border);margin-top:14px;padding-top:12px}
+.photolabel{font-size:.82rem;font-weight:900;color:var(--text-muted);margin-bottom:8px}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-bottom:10px}
+.photo{position:relative;border:2px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
+.photo img{width:100%;height:104px;object-fit:cover;display:block;cursor:zoom-in}
+.photo .del{
+  position:absolute;top:3px;right:3px;width:26px;height:26px;border:none;border-radius:50%;
+  background:rgba(192,57,43,.92);color:#fff;font-size:1rem;font-weight:900;line-height:1;
+  cursor:pointer;font-family:inherit;
+}
+.hint{font-size:.74rem;color:var(--text-muted);margin:8px 0 0;line-height:1.5}
+.lightbox{
+  position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9998;
+  display:flex;align-items:center;justify-content:center;padding:12px;cursor:zoom-out;
+}
+.lightbox[hidden]{display:none}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain}
+.lightbox .close{
+  position:absolute;top:14px;right:16px;background:#fff;color:#000;border:none;
+  border-radius:999px;padding:8px 18px;font-family:inherit;font-weight:900;cursor:pointer;
+}
+
+/* ===== 編集 ===== */
+.note{
+  background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:10px;
+  padding:10px 12px;font-size:.8rem;color:var(--warn);margin-bottom:14px;line-height:1.5;
+}
+.acc{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:10px;overflow:hidden}
+.acc>summary{
+  padding:14px 16px;font-weight:900;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:9px;font-size:.98rem;
+}
+.acc>summary::-webkit-details-marker{display:none}
+.acc>summary::after{content:'＋';margin-left:auto;color:var(--text-muted);font-weight:700}
+.acc[open]>summary::after{content:'−'}
+.acc>summary .cnt{
+  font-size:.72rem;background:var(--primary);color:#fff;border-radius:999px;
+  padding:1px 9px;font-weight:700;
+}
+.accbody{padding:0 16px 16px}
+
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f{display:flex;flex-direction:column;gap:3px}
+.f.full{grid-column:1/-1}
+.f label{font-size:.76rem;font-weight:700;color:var(--text-muted)}
+.input{
+  width:100%;padding:9px 12px;border:2px solid var(--border);border-radius:8px;
+  font-size:.95rem;font-family:inherit;color:var(--text);background:#fff;
+  transition:border-color .2s;
+}
+.input:focus{outline:none;border-color:var(--primary)}
+textarea.input{min-height:64px;resize:vertical}
+.chk{
+  grid-column:1/-1;display:flex;align-items:center;gap:8px;background:var(--alert-bg);
+  border:2px solid var(--alert-border);border-radius:8px;padding:8px 11px;
+}
+.chk input{width:20px;height:20px;accent-color:var(--alert);flex:0 0 auto}
+.chk label{font-size:.85rem;font-weight:900;color:var(--alert)}
+.chk.ok{background:#eef4ea;border-color:#c5d8bb;margin-bottom:12px}
+.chk.ok input{accent-color:var(--primary)}
+.chk.ok label{color:var(--primary-dark)}
+.acc>summary .cnt.zero{background:var(--text-muted)}
+
+.litem{border:2px solid var(--border);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+.litem .lhead{display:flex;align-items:center;margin-bottom:9px}
+.litem .lhead span{font-size:.78rem;font-weight:900;color:var(--text-muted)}
+.litem .lhead button{margin-left:auto}
+.empty{color:var(--text-muted);font-size:.85rem;padding:6px 0 12px}
+
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(90px);
+  background:#2d3748;color:#fff;padding:12px 24px;border-radius:999px;font-size:.88rem;
+  font-weight:700;transition:transform .3s;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.2);
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+@media (max-width:420px){
+  .fgrid{grid-template-columns:1fr}
+  .acpgrid{grid-template-columns:1fr}
+}
+
+@media print{
+  header,.chips,.toolbar,.note,.no-print{display:none!important}
+  body{background:#fff;font-size:11pt}
+  .wrap{max-width:none;padding:0}
+  .card{box-shadow:none;padding:0;font-size:11pt}
+  .cblock{break-inside:avoid;page-break-inside:avoid}
+  .cblock.alert,.cblock.warn{border-width:2px}
+  .row{background:#fff!important;border:1px solid #ccc;border-left-width:4px}
+  .cardphotos img{max-height:none}
+  .lightbox{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hinner">
+    <h1>🏥 家族の医療カード</h1>
+    <p>急な受診・救急搬送のときに、この画面を見せてください</p>
+  </div>
+</header>
+
+<div class="swarn" id="storageWarn" hidden role="alert">
+  ⚠️ この画面では入力を保存できません。入力内容はページを閉じると消えます。<br>
+  ブラウザ（Safari / Chrome）でこのページのURLを直接開いてからご利用ください。
+</div>
+
+<div class="wrap">
+  <div class="chips" id="chips" role="tablist" aria-label="家族の切り替え"></div>
+
+  <!-- ===== 救急カード ===== -->
+  <div class="section active" id="sec-card">
+    <div class="toolbar no-print">
+      <button class="btn ghost sm" id="btnEdit">✏️ 編集</button>
+      <button class="btn ghost sm" id="btnFont">🔍 文字を大きく</button>
+      <button class="btn ghost sm" id="btnPrint">🖨 印刷</button>
+    </div>
+    <div class="card" id="card" aria-live="polite"></div>
+  </div>
+
+  <!-- ===== 編集 ===== -->
+  <div class="section" id="sec-edit">
+    <div class="note">
+      入力した内容は<b>この端末のブラウザの中だけ</b>に保存されます（外部には一切送信されません）。
+      入力はそのつど自動保存され、「保存」でカード画面にもどります。
+    </div>
+    <div id="editor"></div>
+    <div class="toolbar">
+      <button class="btn grow" id="btnSave">✓ 保存</button>
+      <button class="btn danger sm" id="btnDelMember">この人を削除</button>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox" class="lightbox" hidden role="dialog" aria-label="お薬手帳の写真">
+  <button class="close" id="lightboxClose">閉じる</button>
+  <img id="lightboxImg" alt="お薬手帳の写真">
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ===================== 状態 ===================== */
+const KEY = 'famcard_v1';
+const ACP_OPTS = ['未記入','希望する','希望しない','状況による','本人と相談中'];
+
+const SCHEMA = [
+  { id:'basic', title:'基本情報', icon:'👤', type:'form', fields:[
+    {k:'name',l:'氏名',t:'text',ph:'山田 花子'},
+    {k:'kana',l:'ふりがな',t:'text',ph:'やまだ はなこ'},
+    {k:'relation',l:'続柄',t:'text',ph:'母／父／本人'},
+    {k:'birth',l:'生年月日',t:'date'},
+    {k:'sex',l:'性別',t:'select',opts:['','男性','女性','その他']},
+    {k:'blood',l:'血液型',t:'select',opts:['','A型 Rh+','A型 Rh−','B型 Rh+','B型 Rh−','O型 Rh+','O型 Rh−','AB型 Rh+','AB型 Rh−','不明']},
+    {k:'height',l:'身長（cm）',t:'number'},
+    {k:'weight',l:'体重（kg）',t:'number'},
+    {k:'phone',l:'本人の電話',t:'tel'},
+    {k:'address',l:'住所',t:'text',full:true},
+    {k:'topnote',l:'まず最初に伝えたいこと',t:'area',full:true,ph:'例）話すことはできますが、耳が遠く大きな声が必要です'}
+  ]},
+  { id:'allergies', title:'アレルギー・薬剤副作用', icon:'⚠️', type:'list', unit:'アレルギー', noneable:true, noneLabel:'アレルギー・副作用は「なし」（確認済み）', fields:[
+    {k:'item',l:'原因（薬剤名・食品名など）',t:'text',full:true,ph:'ペニシリン／そば'},
+    {k:'kind',l:'種別',t:'select',opts:['薬剤','食物','造影剤','ラテックス','その他']},
+    {k:'severity',l:'重症度',t:'select',opts:['','軽度','中等度','重度（アナフィラキシー）']},
+    {k:'reaction',l:'症状',t:'text',full:true,ph:'発疹／呼吸困難'}
+  ]},
+  { id:'meds', title:'内服薬・処方', icon:'💊', type:'list', unit:'薬', noneable:true, noneLabel:'内服薬は「なし」（確認済み）', photos:true, fields:[
+    {k:'name',l:'薬剤名',t:'text',ph:'エリキュース錠'},
+    {k:'dose',l:'規格・1回量',t:'text',ph:'5mg 1錠'},
+    {k:'timing',l:'服用時点',t:'text',ph:'朝夕食後'},
+    {k:'purpose',l:'目的・対象の病気',t:'text',ph:'心房細動'},
+    {k:'prescriber',l:'処方元',t:'text',ph:'○○内科'},
+    {k:'start',l:'開始時期',t:'text',ph:'2024年4月'},
+    {k:'alert',l:'抗凝固薬・抗血小板薬（血をサラサラにする薬）',t:'check'},
+    {k:'note',l:'メモ（最終内服日時など）',t:'text',full:true}
+  ]},
+  { id:'conditions', title:'病歴・現在の病気', icon:'🩺', type:'list', unit:'病名', noneable:true, noneLabel:'病歴・持病は「なし」（確認済み）', fields:[
+    {k:'name',l:'病名',t:'text',full:true,ph:'心房細動'},
+    {k:'status',l:'状態',t:'select',opts:['治療中','経過観察','既往（治癒）']},
+    {k:'year',l:'発症・診断時期',t:'text',ph:'2020年'},
+    {k:'hospital',l:'病院・主治医',t:'text',full:true},
+    {k:'note',l:'メモ',t:'text',full:true}
+  ]},
+  { id:'acp', title:'本人の意向（ACP・事前指示）', icon:'🕊', type:'form', fields:[
+    {k:'cpr',l:'心肺蘇生（心臓マッサージ）',t:'select',opts:ACP_OPTS},
+    {k:'intubation',l:'気管挿管・人工呼吸器',t:'select',opts:ACP_OPTS},
+    {k:'feeding',l:'人工栄養（胃ろう・経鼻・点滴）',t:'select',opts:ACP_OPTS},
+    {k:'transfusion',l:'輸血',t:'select',opts:ACP_OPTS},
+    {k:'dialysis',l:'透析',t:'select',opts:ACP_OPTS},
+    {k:'hospitalize',l:'入院',t:'select',opts:ACP_OPTS},
+    {k:'place',l:'最期を過ごしたい場所',t:'text',full:true,ph:'自宅で過ごしたい'},
+    {k:'proxy',l:'代理意思決定者（氏名・続柄・電話）',t:'text',full:true},
+    {k:'notify',l:'病名告知の希望',t:'select',full:true,opts:['未記入','本人に伝えてほしい','本人には伝えないでほしい','家族と相談してほしい']},
+    {k:'doc',l:'事前指示書・リビングウィル（有無と保管場所）',t:'text',full:true},
+    {k:'values',l:'本人が大切にしていること',t:'area',full:true,ph:'例）痛みや苦しみがないことを一番に望んでいる'},
+    {k:'talkedAt',l:'話し合った日・同席者',t:'text',full:true,ph:'2026年3月 本人・長女・主治医'}
+  ]},
+  { id:'contacts', title:'連絡先（かかりつけ・家族）', icon:'📞', type:'list', unit:'連絡先', fields:[
+    {k:'kind',l:'区分',t:'select',opts:['家族','かかりつけ医','専門病院','訪問看護','ケアマネジャー','調剤薬局','その他']},
+    {k:'name',l:'名称・氏名',t:'text'},
+    {k:'phone',l:'電話番号',t:'tel'},
+    {k:'note',l:'メモ（担当者・診察日など）',t:'text',full:true}
+  ]},
+  { id:'devices', title:'体内デバイス・医療処置（MRI可否）', icon:'🔧', type:'list', unit:'デバイス', noneable:true, noneLabel:'体内デバイス・医療処置は「なし」（確認済み）', fields:[
+    {k:'name',l:'種類',t:'text',full:true,ph:'ペースメーカー／ステント／人工関節／シャント／CVポート／胃ろう／ストーマ'},
+    {k:'site',l:'部位',t:'text'},
+    {k:'year',l:'留置時期',t:'text'},
+    {k:'mri',l:'MRI',t:'select',opts:['不明','可','条件付き可','不可']},
+    {k:'note',l:'メモ（機種・手帳の保管場所）',t:'text',full:true}
+  ]},
+  { id:'infections', title:'感染症情報', icon:'🦠', type:'list', unit:'項目', noneable:true, noneLabel:'感染症は「なし」（確認済み）', fields:[
+    {k:'name',l:'項目',t:'text',ph:'HBV／HCV／HIV／MRSA／結核'},
+    {k:'result',l:'判定',t:'select',opts:['陽性','陰性','不明']},
+    {k:'date',l:'確認日',t:'text'},
+    {k:'note',l:'メモ',t:'text',full:true}
+  ]},
+  { id:'baseline', title:'平常時のようす（ベースライン）', icon:'📊', type:'form', fields:[
+    {k:'bp',l:'普段の血圧',t:'text',ph:'120/70前後'},
+    {k:'pulse',l:'普段の脈拍',t:'text',ph:'70台'},
+    {k:'spo2',l:'普段のSpO2',t:'text',ph:'96〜98%'},
+    {k:'temp',l:'平熱',t:'text',ph:'36.2℃'},
+    {k:'bweight',l:'普段の体重',t:'text',ph:'52kg'},
+    {k:'adl',l:'ADL',t:'select',opts:['','自立','見守り','一部介助','全介助','寝たきり']},
+    {k:'walk',l:'移動手段',t:'text',ph:'杖歩行／車いす'},
+    {k:'cognition',l:'認知症',t:'select',opts:['','なし','軽度','中等度','重度']},
+    {k:'communication',l:'普段の意思疎通・会話',t:'area',full:true,ph:'自分の名前と場所は言える。難聴あり。'},
+    {k:'note',l:'「いつもと違う」と分かるポイント',t:'area',full:true,ph:'呼びかけへの返事が遅い／食事量が半分以下'}
+  ]},
+  { id:'surgeries', title:'手術・入院歴', icon:'🏨', type:'list', unit:'履歴', noneable:true, noneLabel:'手術・入院歴は「なし」（確認済み）', fields:[
+    {k:'name',l:'内容',t:'text',full:true,ph:'胆のう摘出術'},
+    {k:'date',l:'時期',t:'text'},
+    {k:'hospital',l:'病院',t:'text'},
+    {k:'note',l:'メモ',t:'text',full:true}
+  ]},
+  { id:'insurance', title:'保険・制度', icon:'🪪', type:'form', fields:[
+    {k:'hoken',l:'健康保険の種類',t:'text',ph:'後期高齢者医療'},
+    {k:'hokenNo',l:'記号・番号',t:'text'},
+    {k:'cardNo',l:'診察券番号',t:'text'},
+    {k:'kaigoNo',l:'介護保険 被保険者番号',t:'text'},
+    {k:'kaigoLevel',l:'要介護度',t:'select',opts:['','非該当','要支援1','要支援2','要介護1','要介護2','要介護3','要介護4','要介護5']},
+    {k:'techo',l:'障害者手帳など',t:'text'},
+    {k:'gendo',l:'限度額適用認定証',t:'text'}
+  ]},
+  { id:'lifestyle', title:'生活歴・その他の配慮', icon:'🌿', type:'form', fields:[
+    {k:'smoke',l:'喫煙',t:'text',ph:'20本×40年／10年前に禁煙'},
+    {k:'alcohol',l:'飲酒',t:'text',ph:'ビール1本／日'},
+    {k:'vaccine',l:'ワクチン接種歴',t:'text',full:true,ph:'肺炎球菌 2024年／インフルエンザ 毎年'},
+    {k:'religion',l:'宗教・信条上の配慮',t:'text',full:true,ph:'輸血は受けられない など'}
+  ]}
+];
+
+const LIST_IDS = SCHEMA.filter(s => s.type === 'list').map(s => s.id);
+
+let state = loadState();
+let curId = state.members.length ? state.members[0].id : null;
+let bigFont = false;
+
+/* ===================== ユーティリティ ===================== */
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function uid(){ return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(state));
+    return true;
+  }catch(e){
+    if(e && (e.name === 'QuotaExceededError' || e.code === 22)){
+      showToast('保存できませんでした（写真の枚数が多すぎます）', 3500);
+    }else{
+      showToast('この画面では保存できません。ブラウザでURLを直接開いてください', 4000);
+      storageOK = false;
+      document.getElementById('storageWarn').hidden = false;
+    }
+    return false;
+  }
+}
+
+/* この環境で保存できるかを起動時に判定 */
+let storageOK = true;
+function checkStorage(){
+  try{
+    localStorage.setItem('__famcard_test', '1');
+    localStorage.removeItem('__famcard_test');
+    return true;
+  }catch(e){ return false; }
+}
+function loadState(){
+  try{
+    const v = localStorage.getItem(KEY);
+    const d = v ? JSON.parse(v) : null;
+    if(d && Array.isArray(d.members) && d.members.length) return normalize(d);
+  }catch(e){ /* 壊れていたら初期化 */ }
+  return { version:1, members:[ newMember('本人') ] };
+}
+function normalize(d){
+  d.members.forEach(m => {
+    if(!m.id) m.id = uid();
+    if(!m.none || typeof m.none !== 'object') m.none = {};
+    if(!Array.isArray(m.medPhotos)) m.medPhotos = [];
+    SCHEMA.forEach(s => {
+      if(s.type === 'list'){ if(!Array.isArray(m[s.id])) m[s.id] = []; }
+      else if(!m[s.id] || typeof m[s.id] !== 'object'){ m[s.id] = {}; }
+    });
+  });
+  return d;
+}
+function newMember(relation){
+  const m = { id:uid(), updatedAt:'', none:{}, medPhotos:[] };
+  SCHEMA.forEach(s => { m[s.id] = s.type === 'list' ? [] : {}; });
+  m.basic.name = '';
+  m.basic.relation = relation || '';
+  return m;
+}
+function cur(){ return state.members.find(m => m.id === curId) || state.members[0]; }
+function touch(){
+  const m = cur();
+  if(m) m.updatedAt = formatDate();
+  save();
+}
+function formatDate(d){
+  d = d || new Date();
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function age(birth){
+  if(!birth) return '';
+  const b = new Date(birth);
+  if(isNaN(b.getTime())) return '';
+  const t = new Date();
+  let a = t.getFullYear() - b.getFullYear();
+  const md = t.getMonth() - b.getMonth();
+  if(md < 0 || (md === 0 && t.getDate() < b.getDate())) a--;
+  return (a >= 0 && a < 130) ? a + '歳' : '';
+}
+function jpDate(v){
+  if(!v) return '';
+  const d = new Date(v);
+  if(isNaN(d.getTime())) return v;
+  return d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+}
+function showToast(msg, ms){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._id);
+  showToast._id = setTimeout(() => t.classList.remove('show'), ms || 2200);
+}
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function nonEmpty(obj, keys){
+  return keys.some(k => String((obj && obj[k]) || '').trim() !== '');
+}
+
+/* ===================== メンバータブ ===================== */
+function renderChips(){
+  const el = document.getElementById('chips');
+  const html = state.members.map(m => {
+    const label = (m.basic.name || '名前未入力') + (m.basic.relation ? '（'+m.basic.relation+'）' : '');
+    return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
+  }).join('');
+  el.innerHTML = html + '<button class="chip add" id="chipAdd" aria-label="家族を追加">＋ 家族を追加</button>';
+}
+
+/* ===================== 救急カード ===================== */
+function renderCard(){
+  const m = cur();
+  const el = document.getElementById('card');
+  if(!m){ el.innerHTML = '<p class="none">登録がありません。</p>'; return; }
+
+  const b = m.basic || {};
+  const isNone = id => !!(m.none||{})[id];
+  let h = '';
+
+  /* --- 氏名ヘッダー --- */
+  const meta = [];
+  if(b.relation) meta.push(esc(b.relation));
+  if(age(b.birth)) meta.push('<b>'+age(b.birth)+'</b>');
+  if(b.sex) meta.push(esc(b.sex));
+  if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
+  h += '<p class="pname">'+esc(b.name || '（氏名未入力）')+'</p>';
+  if(b.kana) h += '<p class="pmeta">'+esc(b.kana)+'</p>';
+  h += '<p class="pmeta">'+meta.join(' ・ ')+'</p>';
+  if(b.birth) h += '<p class="pmeta">生年月日 '+esc(jpDate(b.birth))+'</p>';
+  if(b.topnote) h += '<div class="cblock"><h3>まず最初に</h3><div class="hero">'+esc(b.topnote)+'</div></div>';
+
+  /* --- ⚠ アレルギー（常に表示） --- */
+  const al = (m.allergies||[]).filter(a => nonEmpty(a,['item','reaction']));
+  const alNone = !al.length && isNone('allergies');
+  h += '<section class="cblock '+(alNone?'ok':'alert')+'"><h3>'+(alNone?'✅':'⚠️')+' アレルギー・薬の副作用</h3>';
+  if(al.length){
+    h += '<div class="rows">' + al.map(a =>
+      '<div class="row"><div class="t">'+esc(a.item)+
+        (a.severity && a.severity.indexOf('重度')===0 ? '<span class="tag">重度</span>' : '')+'</div>'+
+      '<div class="s">'+[a.kind,a.reaction,a.severity].filter(Boolean).map(esc).join('／')+'</div></div>'
+    ).join('') + '</div>';
+  }else if(alNone){
+    h += '<div class="okmsg">なし（確認済み）</div>';
+  }else{
+    h += '<div class="unknown">未確認</div><div class="none">本人・家族にご確認ください</div>';
+  }
+  h += '</section>';
+
+  /* --- ⚠ 抗凝固薬（常に表示） --- */
+  const meds = (m.meds||[]).filter(x => nonEmpty(x,['name']));
+  const anticoag = meds.filter(x => x.alert);
+  const medsNone = !meds.length && isNone('meds');
+  const acKnown = anticoag.length === 0 && (meds.length > 0 || medsNone);
+  h += '<section class="cblock '+(anticoag.length ? 'alert' : (acKnown ? 'ok' : 'alert'))+'">'+
+       '<h3>'+(anticoag.length ? '⚠️' : (acKnown ? '✅' : '⚠️'))+' 抗凝固薬・抗血小板薬</h3>';
+  if(anticoag.length){
+    h += '<div class="rows">' + anticoag.map(x =>
+      '<div class="row"><div class="t">'+esc(x.name)+' '+esc(x.dose||'')+'</div>'+
+      '<div class="s">'+[x.timing,x.purpose,x.note].filter(Boolean).map(esc).join('／')+'</div></div>'
+    ).join('') + '</div>';
+  }else if(acKnown){
+    h += '<div class="okmsg">なし（確認済み）</div>';
+  }else{
+    h += '<div class="unknown">未確認</div><div class="none">内服薬が未入力です</div>';
+  }
+  h += '</section>';
+
+  /* --- 🕊 意向（ACP） --- */
+  const a = m.acp || {};
+  const acpKeys = [['cpr','心肺蘇生'],['intubation','人工呼吸器'],['feeding','人工栄養'],['transfusion','輸血'],['dialysis','透析'],['hospitalize','入院']];
+  const filled = acpKeys.filter(([k]) => a[k] && a[k] !== '未記入');
+  if(filled.length || nonEmpty(a,['place','proxy','doc','values','notify','talkedAt'])){
+    h += '<section class="cblock warn"><h3>🕊 本人の意向（ACP）</h3>';
+    if(filled.length){
+      h += '<div class="acpgrid">' + filled.map(([k,l]) => {
+        const v = a[k];
+        const cls = v === '希望する' ? 'yes' : (v === '希望しない' ? 'no' : '');
+        return '<div class="acpitem"><div class="l">'+esc(l)+'</div><div class="v '+cls+'">'+esc(v)+'</div></div>';
+      }).join('') + '</div>';
+    }
+    const dl = [];
+    if(a.place) dl.push(['過ごしたい場所', a.place]);
+    if(a.proxy) dl.push(['代理意思決定者', a.proxy]);
+    if(a.notify && a.notify !== '未記入') dl.push(['告知の希望', a.notify]);
+    if(a.doc) dl.push(['事前指示書', a.doc]);
+    if(a.values) dl.push(['大切にしていること', a.values]);
+    if(a.talkedAt) dl.push(['話し合い', a.talkedAt]);
+    if(dl.length){
+      h += '<dl class="kv" style="margin-top:9px">' + dl.map(([k,v]) =>
+        '<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('') + '</dl>';
+    }
+    h += '</section>';
+  }
+
+  /* --- 病歴 --- */
+  const cond = (m.conditions||[]).filter(x => nonEmpty(x,['name']));
+  const active = cond.filter(x => x.status !== '既往（治癒）');
+  const past = cond.filter(x => x.status === '既往（治癒）');
+  if(active.length){
+    h += '<section class="cblock"><h3>🩺 現在の病気・治療中</h3><div class="rows">' +
+      active.map(x =>
+        '<div class="row"><div class="t">'+esc(x.name)+(x.status?'<span class="tag g">'+esc(x.status)+'</span>':'')+'</div>'+
+        '<div class="s">'+[x.year,x.hospital,x.note].filter(Boolean).map(esc).join('／')+'</div></div>'
+      ).join('') + '</div></section>';
+  }else if(isNone('conditions')){
+    h += '<section class="cblock"><h3>🩺 現在の病気・治療中</h3><div class="okmsg">なし（確認済み）</div></section>';
+  }
+
+  /* --- 内服薬 --- */
+  if(meds.length){
+    h += '<section class="cblock"><h3>💊 内服薬（'+meds.length+'種類）</h3><div class="rows">' +
+      meds.map(x =>
+        '<div class="row"><div class="t">'+esc(x.name)+' '+esc(x.dose||'')+
+          (x.alert?'<span class="tag">血液サラサラ</span>':'')+'</div>'+
+        '<div class="s">'+[x.timing,x.purpose,x.prescriber,x.start?('開始 '+x.start):'',x.note].filter(Boolean).map(esc).join('／')+'</div></div>'
+      ).join('') + '</div></section>';
+  }else if(medsNone){
+    h += '<section class="cblock"><h3>💊 内服薬</h3><div class="okmsg">なし（確認済み）</div></section>';
+  }
+
+  /* --- お薬手帳の写真 --- */
+  const photos = m.medPhotos || [];
+  if(photos.length){
+    h += '<section class="cblock"><h3>📷 お薬手帳（' + photos.length + '枚）</h3><div class="cardphotos">' +
+      photos.map((p,i) => '<img src="'+esc(p.data)+'" alt="お薬手帳 '+(i+1)+'枚目" data-zoom="'+i+'">').join('') +
+      '</div></section>';
+  }
+
+  /* --- デバイス --- */
+  const dev = (m.devices||[]).filter(x => nonEmpty(x,['name']));
+  if(dev.length){
+    h += '<section class="cblock"><h3>🔧 体内デバイス・医療処置</h3><div class="rows">' +
+      dev.map(x => {
+        const mriTag = x.mri === '不可' ? '<span class="tag">MRI不可</span>'
+                    : x.mri === '条件付き可' ? '<span class="tag y">MRI条件付き</span>'
+                    : x.mri === '可' ? '<span class="tag g">MRI可</span>' : '';
+        return '<div class="row"><div class="t">'+esc(x.name)+mriTag+'</div>'+
+          '<div class="s">'+[x.site,x.year,x.note].filter(Boolean).map(esc).join('／')+'</div></div>';
+      }).join('') + '</div></section>';
+  }else if(isNone('devices')){
+    h += '<section class="cblock"><h3>🔧 体内デバイス・医療処置</h3><div class="okmsg">なし（確認済み）／MRI制限なし</div></section>';
+  }
+
+  /* --- 感染症 --- */
+  const inf = (m.infections||[]).filter(x => nonEmpty(x,['name']));
+  const pos = inf.filter(x => x.result === '陽性');
+  if(inf.length){
+    h += '<section class="cblock'+(pos.length?' alert':'')+'"><h3>🦠 感染症情報</h3><div class="rows">' +
+      inf.map(x =>
+        '<div class="row"><div class="t">'+esc(x.name)+
+          (x.result==='陽性'?'<span class="tag">陽性</span>':'<span class="tag g">'+esc(x.result||'不明')+'</span>')+'</div>'+
+        '<div class="s">'+[x.date,x.note].filter(Boolean).map(esc).join('／')+'</div></div>'
+      ).join('') + '</div></section>';
+  }else if(isNone('infections')){
+    h += '<section class="cblock"><h3>🦠 感染症情報</h3><div class="okmsg">なし（確認済み）</div></section>';
+  }
+
+  /* --- ベースライン --- */
+  const bl = m.baseline || {};
+  const blKeys = [['bp','普段の血圧'],['pulse','脈拍'],['spo2','SpO2'],['temp','平熱'],['bweight','体重'],
+                  ['adl','ADL'],['walk','移動'],['cognition','認知症'],['communication','意思疎通'],['note','いつもと違うサイン']];
+  const blList = blKeys.filter(([k]) => String(bl[k]||'').trim() !== '');
+  if(blList.length){
+    h += '<section class="cblock"><h3>📊 平常時のようす</h3><dl class="kv">' +
+      blList.map(([k,l]) => '<dt>'+esc(l)+'</dt><dd>'+esc(bl[k])+'</dd>').join('') + '</dl></section>';
+  }
+
+  /* --- 連絡先 --- */
+  const ct = (m.contacts||[]).filter(x => nonEmpty(x,['name','phone']));
+  if(ct.length){
+    h += '<section class="cblock"><h3>📞 連絡先</h3><div class="rows">' +
+      ct.map(x =>
+        '<div class="row"><div class="t">'+esc(x.name)+'<span class="tag g">'+esc(x.kind||'')+'</span></div>'+
+        '<div class="s">'+(x.phone?'<a class="tel" href="tel:'+esc(String(x.phone).replace(/[^0-9+]/g,''))+'">'+esc(x.phone)+'</a>':'')+
+        (x.note?'<br>'+esc(x.note):'')+'</div></div>'
+      ).join('') + '</div></section>';
+  }
+
+  /* --- 手術・入院歴／既往 --- */
+  const sg = (m.surgeries||[]).filter(x => nonEmpty(x,['name']));
+  if(sg.length || past.length){
+    h += '<section class="cblock"><h3>🏨 手術・入院歴／既往</h3><div class="rows">' +
+      sg.map(x => '<div class="row"><div class="t">'+esc(x.name)+'</div><div class="s">'+
+        [x.date,x.hospital,x.note].filter(Boolean).map(esc).join('／')+'</div></div>').join('') +
+      past.map(x => '<div class="row"><div class="t">'+esc(x.name)+'<span class="tag g">既往</span></div><div class="s">'+
+        [x.year,x.hospital,x.note].filter(Boolean).map(esc).join('／')+'</div></div>').join('') +
+      '</div></section>';
+  }else if(isNone('surgeries')){
+    h += '<section class="cblock"><h3>🏨 手術・入院歴</h3><div class="okmsg">なし（確認済み）</div></section>';
+  }
+
+  /* --- 生活歴 --- */
+  const lf = m.lifestyle || {};
+  const lfKeys = [['smoke','喫煙'],['alcohol','飲酒'],['vaccine','ワクチン'],['religion','宗教・信条の配慮']];
+  const lfList = lfKeys.filter(([k]) => String(lf[k]||'').trim() !== '');
+  if(lfList.length){
+    h += '<section class="cblock"><h3>🌿 生活歴・配慮</h3><dl class="kv">' +
+      lfList.map(([k,l]) => '<dt>'+esc(l)+'</dt><dd>'+esc(lf[k])+'</dd>').join('') + '</dl></section>';
+  }
+
+  /* --- 保険・事務 --- */
+  const iv = m.insurance || {};
+  const ivKeys = [['hoken','健康保険'],['hokenNo','記号・番号'],['cardNo','診察券番号'],
+                  ['kaigoNo','介護保険番号'],['kaigoLevel','要介護度'],['techo','手帳'],['gendo','限度額認定証']];
+  const ivList = ivKeys.filter(([k]) => String(iv[k]||'').trim() !== '');
+  const addr = [b.address, b.phone].filter(Boolean);
+  if(ivList.length || addr.length){
+    h += '<section class="cblock"><h3>🪪 保険・連絡事項</h3><dl class="kv">' +
+      (b.address?'<dt>住所</dt><dd>'+esc(b.address)+'</dd>':'') +
+      (b.phone?'<dt>本人の電話</dt><dd>'+esc(b.phone)+'</dd>':'') +
+      ivList.map(([k,l]) => '<dt>'+esc(l)+'</dt><dd>'+esc(iv[k])+'</dd>').join('') + '</dl></section>';
+  }
+
+  h += '<p class="updated">最終更新：'+esc(m.updatedAt || '未更新')+'</p>';
+  el.innerHTML = h;
+}
+
+/* ===================== 編集画面 ===================== */
+function fieldHTML(sec, f, val, idx){
+  const id = 'f_'+sec+'_'+f.k+(idx!=null?'_'+idx:'');
+  const dataAttr = 'data-sec="'+esc(sec)+'" data-k="'+esc(f.k)+'"'+(idx!=null?' data-i="'+idx+'"':'');
+  if(f.t === 'check'){
+    return '<div class="chk"><input type="checkbox" id="'+id+'" '+dataAttr+(val?' checked':'')+'>'+
+           '<label for="'+id+'">'+esc(f.l)+'</label></div>';
+  }
+  let inner;
+  if(f.t === 'select'){
+    inner = '<select class="input" id="'+id+'" '+dataAttr+'>' +
+      f.opts.map(o => '<option value="'+esc(o)+'"'+(String(val||'')===o?' selected':'')+'>'+esc(o||'—')+'</option>').join('') +
+      '</select>';
+  }else if(f.t === 'area'){
+    inner = '<textarea class="input" id="'+id+'" '+dataAttr+' placeholder="'+esc(f.ph||'')+'">'+esc(val||'')+'</textarea>';
+  }else{
+    inner = '<input class="input" type="'+esc(f.t)+'" id="'+id+'" '+dataAttr+
+            ' value="'+esc(val||'')+'" placeholder="'+esc(f.ph||'')+'">';
+  }
+  return '<div class="f'+(f.full?' full':'')+'"><label for="'+id+'">'+esc(f.l)+'</label>'+inner+'</div>';
+}
+
+/* ===== お薬手帳の写真 ===== */
+const MAX_PHOTOS = 8;
+
+function photoEditorHTML(m){
+  const ps = m.medPhotos || [];
+  return '<div class="photobox">' +
+    '<div class="photolabel">📷 お薬手帳の写真（' + ps.length + '／' + MAX_PHOTOS + '枚）</div>' +
+    (ps.length
+      ? '<div class="photos">' + ps.map((p,i) =>
+          '<div class="photo"><img src="' + esc(p.data) + '" alt="お薬手帳 ' + (i+1) + '枚目" data-zoom="' + i + '">' +
+          '<button class="del" data-delphoto="' + i + '" aria-label="' + (i+1) + '枚目の写真を削除">×</button></div>'
+        ).join('') + '</div>'
+      : '<p class="empty">写真はまだありません</p>') +
+    '<input type="file" id="photoInput" accept="image/*" hidden>' +
+    '<button class="btn sm" id="btnAddPhoto"' + (ps.length >= MAX_PHOTOS ? ' disabled' : '') + '>＋ 写真を撮る／選ぶ</button>' +
+    '<p class="hint">お薬手帳のページを撮影して登録できます。写真は自動で縮小され、この端末の中だけに保存されます。</p>' +
+  '</div>';
+}
+
+function shrinkImage(file, maxEdge, quality){
+  return new Promise((resolve, reject) => {
+    if(!file || !/^image\//.test(file.type)) { reject(new Error('画像ではありません')); return; }
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('読み込めませんでした'));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('画像を開けませんでした'));
+      img.onload = () => {
+        let w = img.naturalWidth, hgt = img.naturalHeight;
+        const scale = Math.min(1, maxEdge / Math.max(w, hgt));
+        w = Math.max(1, Math.round(w * scale));
+        hgt = Math.max(1, Math.round(hgt * scale));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = hgt;
+        cv.getContext('2d').drawImage(img, 0, 0, w, hgt);
+        resolve(cv.toDataURL('image/jpeg', quality));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+async function addPhoto(file){
+  const m = cur();
+  if((m.medPhotos||[]).length >= MAX_PHOTOS){ showToast('写真は' + MAX_PHOTOS + '枚までです'); return; }
+  showToast('写真を取り込んでいます…', 4000);
+  try{
+    const data = await shrinkImage(file, 1400, 0.72);
+    m.medPhotos.push({ data:data, at:formatDate() });
+    if(save()){
+      m.updatedAt = formatDate();
+      save();
+      showToast('写真を追加しました');
+    }else{
+      m.medPhotos.pop();
+    }
+  }catch(err){
+    showToast('写真を取り込めませんでした');
+  }
+  renderEditor(); reopen('meds');
+}
+
+function openLightbox(src){
+  const box = document.getElementById('lightbox');
+  document.getElementById('lightboxImg').src = src;
+  box.hidden = false;
+}
+document.getElementById('lightbox').addEventListener('click', () => {
+  const box = document.getElementById('lightbox');
+  box.hidden = true;
+  document.getElementById('lightboxImg').src = '';
+});
+
+function renderEditor(){
+  const m = cur();
+  const el = document.getElementById('editor');
+  if(!m){ el.innerHTML = ''; return; }
+
+  el.innerHTML = SCHEMA.map(s => {
+    let body;
+    if(s.type === 'form'){
+      body = '<div class="fgrid">' + s.fields.map(f => fieldHTML(s.id, f, (m[s.id]||{})[f.k])).join('') + '</div>';
+    }else{
+      const arr = m[s.id] || [];
+      const isNone = !!(m.none||{})[s.id];
+      const noneChk = s.noneable
+        ? '<div class="chk ok"><input type="checkbox" id="none_'+esc(s.id)+'" data-sec="none" data-k="'+esc(s.id)+'"'+(isNone?' checked':'')+'>'+
+          '<label for="none_'+esc(s.id)+'">'+esc(s.noneLabel || '該当なし（確認済み）')+'</label></div>'
+        : '';
+      const list = (arr.length ? arr.map((row,i) =>
+        '<div class="litem"><div class="lhead"><span>'+esc(s.unit)+' '+(i+1)+'</span>'+
+        '<button class="btn danger sm" data-del="'+esc(s.id)+'" data-i="'+i+'">削除</button></div>'+
+        '<div class="fgrid">' + s.fields.map(f => fieldHTML(s.id, f, row[f.k], i)).join('') + '</div></div>'
+      ).join('') : '<p class="empty">まだ登録がありません</p>') +
+      '<button class="btn sm" data-add="'+esc(s.id)+'">＋ '+esc(s.unit)+'を追加</button>';
+      body = noneChk + (isNone ? '<p class="empty">カードには「なし（確認済み）」と表示されます。</p>' : list)
+           + (s.photos ? photoEditorHTML(m) : '');
+    }
+    const cnt = s.type !== 'list' ? ''
+      : ((m.none||{})[s.id] ? '<span class="cnt zero">なし</span>'
+        : ((m[s.id]||[]).length ? '<span class="cnt">'+(m[s.id].length)+'</span>' : ''));
+    const open = (s.id === 'basic') ? ' open' : '';
+    return '<details class="acc"'+open+'><summary>'+esc(s.icon)+' '+esc(s.title)+cnt+'</summary>'+
+           '<div class="accbody">'+body+'</div></details>';
+  }).join('');
+}
+
+/* ===================== イベント ===================== */
+document.getElementById('chips').addEventListener('click', e => {
+  const add = e.target.closest('#chipAdd');
+  if(add){
+    const m = newMember('');
+    state.members.push(m);
+    curId = m.id;
+    save(); renderAll(); showSection('sec-edit');
+    showToast('家族を追加しました。氏名を入力してください');
+    return;
+  }
+  const chip = e.target.closest('.chip[data-mid]');
+  if(chip){ curId = chip.dataset.mid; renderAll(); }
+});
+
+document.getElementById('editor').addEventListener('input', onEdit);
+document.getElementById('editor').addEventListener('change', onEdit);
+
+function onEdit(e){
+  const t = e.target;
+  const sec = t.dataset.sec, k = t.dataset.k;
+  if(!sec || !k) return;
+  const m = cur();
+  const val = (t.type === 'checkbox') ? t.checked : t.value;
+  if(t.dataset.i != null){
+    const i = Number(t.dataset.i);
+    if(!m[sec][i]) return;
+    m[sec][i][k] = val;
+  }else{
+    m[sec][k] = val;
+  }
+  touch();
+  if(sec === 'basic' && (k === 'name' || k === 'relation')) renderChips();
+  if(sec === 'none'){ renderEditor(); reopen(k); }
+  clearTimeout(onEdit._t);
+  onEdit._t = setTimeout(() => showToast('保存しました'), 600);
+}
+
+document.getElementById('editor').addEventListener('change', e => {
+  if(e.target.id === 'photoInput'){
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(file) addPhoto(file);
+  }
+});
+
+document.getElementById('editor').addEventListener('click', e => {
+  if(e.target.closest('#btnAddPhoto')){
+    document.getElementById('photoInput').click();
+    return;
+  }
+  const zoomBtn = e.target.closest('[data-zoom]');
+  if(zoomBtn){ openLightbox(zoomBtn.src); return; }
+  const delPhoto = e.target.closest('[data-delphoto]');
+  if(delPhoto){
+    if(confirm('この写真を削除します。よろしいですか？')){
+      cur().medPhotos.splice(Number(delPhoto.dataset.delphoto), 1);
+      touch(); renderEditor(); reopen('meds');
+      showToast('削除しました');
+    }
+    return;
+  }
+  const addBtn = e.target.closest('[data-add]');
+  if(addBtn){
+    const sec = addBtn.dataset.add;
+    const s = SCHEMA.find(x => x.id === sec);
+    const row = {};
+    s.fields.forEach(f => { row[f.k] = (f.t === 'check') ? false : (f.t === 'select' ? (f.opts[0]||'') : ''); });
+    cur()[sec].push(row);
+    touch(); renderEditor(); reopen(sec);
+    return;
+  }
+  const delBtn = e.target.closest('[data-del]');
+  if(delBtn){
+    const sec = delBtn.dataset.del, i = Number(delBtn.dataset.i);
+    if(confirm('この項目を削除します。よろしいですか？')){
+      cur()[sec].splice(i,1);
+      touch(); renderEditor(); reopen(sec);
+      showToast('削除しました');
+    }
+  }
+});
+function reopen(sec){
+  const idx = SCHEMA.findIndex(x => x.id === sec);
+  const d = document.querySelectorAll('#editor .acc')[idx];
+  if(d){ d.open = true; d.scrollIntoView({block:'nearest'}); }
+}
+
+document.getElementById('card').addEventListener('click', e => {
+  const img = e.target.closest('[data-zoom]');
+  if(img) openLightbox(img.src);
+});
+
+document.getElementById('btnEdit').onclick = () => { renderEditor(); showSection('sec-edit'); };
+document.getElementById('btnSave').onclick = () => {
+  save(); renderAll(); showSection('sec-card');
+  showToast('保存しました');
+};
+document.getElementById('btnPrint').onclick = () => window.print();
+document.getElementById('btnFont').onclick = e => {
+  bigFont = !bigFont;
+  document.documentElement.style.setProperty('--card-fs', bigFont ? '1.28rem' : '1rem');
+  e.target.textContent = bigFont ? '🔍 文字を標準に' : '🔍 文字を大きく';
+};
+
+document.getElementById('btnDelMember').onclick = () => {
+  if(state.members.length <= 1){ showToast('最後の1人は削除できません'); return; }
+  const m = cur();
+  if(confirm('「'+(m.basic.name||'名前未入力')+'」のデータをすべて削除します。よろしいですか？')){
+    state.members = state.members.filter(x => x.id !== m.id);
+    curId = state.members[0].id;
+    save(); renderAll(); renderEditor(); showSection('sec-card');
+    showToast('削除しました');
+  }
+};
+
+/* ===================== 初期化 ===================== */
+function renderAll(){ renderChips(); renderCard(); }
+storageOK = checkStorage();
+if(!storageOK) document.getElementById('storageWarn').hidden = false;
+renderAll();
+</script>
+</body>
+</html>
