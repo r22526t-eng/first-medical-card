@@ -1401,6 +1401,13 @@ if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
+  /* アプリが新しくなったら、その場で最新の画面に入れ替える */
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(swReloaded) return;
+    swReloaded = true;
+    location.reload();
+  });
 }
 </script>
 </body>
