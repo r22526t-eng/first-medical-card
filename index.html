@@ -67,6 +67,14 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
 }
 .swarn[hidden]{display:none}
 
+.pbanner{
+  background:var(--warn-bg);border-bottom:2px solid var(--warn-border);color:var(--warn);
+  padding:10px 14px;font-size:.8rem;font-weight:700;line-height:1.5;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center;
+}
+.pbanner[hidden]{display:none}
+.pbanner .pbtns{display:flex;gap:8px;flex:0 0 auto}
+
 /* ===== メンバータブ ===== */
 .chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;-webkit-overflow-scrolling:touch}
 .chip{
@@ -110,6 +118,10 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
 }
 .card .pname:hover,.card .pname:focus{background:var(--bg);outline:none}
 .card .pname .editmark{font-size:.5em;margin-left:8px;opacity:.5;vertical-align:middle}
+.card .pname.empty{
+  font-size:1.15em;color:var(--primary-dark);border:2px dashed var(--border);
+  display:inline-block;padding:8px 18px;margin-left:0;
+}
 .card .pmeta{margin:4px 0 0;font-size:.92em;color:var(--text-muted);font-weight:500}
 .card .pmeta b{color:var(--text);font-weight:700}
 .card .updated{margin-top:14px;font-size:.78em;color:var(--text-muted);text-align:right}
@@ -284,13 +296,20 @@ textarea.input{min-height:64px;resize:vertical}
   ブラウザ（Safari / Chrome）でこのページのURLを直接開いてからご利用ください。
 </div>
 
+<div class="pbanner" id="syncPrompt" hidden>
+  <span>この端末の入力は、まだ家族と共有されていません。<b>合言葉を入れると、他の端末からも見られるようになります。</b></span>
+  <span class="pbtns">
+    <button class="btn sm" id="btnPromptSet">設定する</button>
+    <button class="btn ghost sm" id="btnPromptLater">あとで</button>
+  </span>
+</div>
+
 <div class="wrap">
   <div class="chips" id="chips" role="tablist" aria-label="家族の切り替え"></div>
 
   <!-- ===== 救急カード ===== -->
   <div class="section active" id="sec-card">
     <div class="toolbar no-print">
-      <button class="btn ghost sm" id="btnEdit">✏️ 編集</button>
       <button class="btn ghost sm" id="btnFont">🔍 文字を大きく</button>
       <button class="btn ghost sm" id="btnPrint">🖨 印刷</button>
       <button class="btn ghost sm" id="btnSync" hidden>🔄 同期</button>
@@ -560,7 +579,7 @@ function nonEmpty(obj, keys){
 function renderChips(){
   const el = document.getElementById('chips');
   const html = liveMembers().map(m => {
-    const label = m.basic.name || '名前未入力';
+    const label = String(m.basic.name || '').trim() || '名前を入力';
     return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
   }).join('');
   el.innerHTML = html + '<button class="chip add" id="chipAdd" aria-label="家族を追加">＋ 家族を追加</button>';
@@ -581,8 +600,11 @@ function renderCard(){
   if(age(b.birth)) meta.push('<b>'+age(b.birth)+'</b>');
   if(b.sex) meta.push(esc(b.sex));
   if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
-  h += '<p class="pname" data-editname tabindex="0" role="button" aria-label="名前や内容を編集する">'+
-       esc(b.name || '（氏名未入力）')+'<span class="editmark">✏️</span></p>';
+  const named = !!String(b.name || '').trim();
+  h += '<p class="pname'+(named?'':' empty')+'" data-editname tabindex="0" role="button" aria-label="'+
+       (named ? '内容を編集する' : '名前を入力する')+'">'+
+       (named ? esc(b.name) + '<span class="editmark">✏️</span>'
+              : '＋ 名前を入力')+'</p>';
   if(b.kana) h += '<p class="pmeta">'+esc(b.kana)+'</p>';
   h += '<p class="pmeta">'+meta.join(' ・ ')+'</p>';
   if(b.birth) h += '<p class="pmeta">生年月日 '+esc(jpDate(b.birth))+'</p>';
@@ -1183,7 +1205,6 @@ function openEditor(sectionId, focusId){
   }
 }
 
-document.getElementById('btnEdit').onclick = () => { renderEditor(); showSection('sec-edit'); };
 document.getElementById('btnSave').onclick = () => {
   save(); renderAll(); showSection('sec-card');
   showToast('保存しました');
@@ -1319,6 +1340,7 @@ function renderSyncUI(){
   const badge = document.getElementById('syncBadge');
   badge.textContent = on ? '共有中' : '未設定';
   badge.className = on ? 'cnt' : 'cnt zero';
+  if(document.getElementById('syncPrompt')) renderSyncPrompt();
   const at = lsGet(SYNCAT_KEY);
   document.getElementById('syncInfo').innerHTML = on
     ? '共有中です。' + (at ? '最終同期：' + esc(at) : 'まだ同期していません') +
@@ -1347,12 +1369,31 @@ document.getElementById('btnSyncOff').onclick = () => {
 document.getElementById('btnSync').onclick = () => syncNow(false);
 window.addEventListener('online', () => syncNow(true));
 
+/* 共有が未設定のうちは案内を出す（入力した内容が端末から失われないように） */
+const PROMPT_KEY = 'famcard_prompt_off';
+function renderSyncPrompt(){
+  const hide = !!syncPass || lsGet(PROMPT_KEY) === '1';
+  document.getElementById('syncPrompt').hidden = hide;
+}
+document.getElementById('btnPromptSet').onclick = () => {
+  openEditor(null, null);
+  const box = document.getElementById('syncBox');
+  box.open = true;
+  box.scrollIntoView({ block: 'center' });
+  document.getElementById('passInput').focus();
+};
+document.getElementById('btnPromptLater').onclick = () => {
+  lsSet(PROMPT_KEY, '1');
+  renderSyncPrompt();
+};
+
 /* ===================== 初期化 ===================== */
 function renderAll(){ renderChips(); renderCard(); }
 storageOK = checkStorage();
 if(!storageOK) document.getElementById('storageWarn').hidden = false;
 renderAll();
 renderSyncUI();
+renderSyncPrompt();
 if(syncPass) syncNow(true);
 
 /* オフラインでも開けるようにする（ホーム画面アプリ用） */
