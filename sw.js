@@ -1,5 +1,5 @@
 /* 家族の医療カード — オフライン用サービスワーカー */
-const CACHE = 'famcard-v7';
+const CACHE = 'famcard-v8';
 const ASSETS = [
   './',
   './index.html',

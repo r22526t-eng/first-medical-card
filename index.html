@@ -84,6 +84,9 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
 }
 .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
 .chip.add{border-style:dashed;color:var(--primary);font-weight:700}
+.addrow{display:flex;gap:8px;align-items:center;margin:8px 0 0}
+.addrow[hidden]{display:none}
+.addrow .input{flex:1;min-width:0}
 
 /* ===== ツールバー ===== */
 .toolbar{display:flex;gap:8px;margin:10px 0 16px;flex-wrap:wrap}
@@ -118,9 +121,9 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
 }
 .card .pname:hover,.card .pname:focus{background:var(--bg);outline:none}
 .card .pname .editmark{font-size:.5em;margin-left:8px;opacity:.5;vertical-align:middle}
-.card .pname.empty{
-  font-size:1.15em;color:var(--primary-dark);border:2px dashed var(--border);
-  display:inline-block;padding:8px 18px;margin-left:0;
+.emptycard{
+  margin:0;padding:22px 8px;text-align:center;color:var(--text-muted);
+  font-weight:700;line-height:1.8;
 }
 .card .pmeta{margin:4px 0 0;font-size:.92em;color:var(--text-muted);font-weight:500}
 .card .pmeta b{color:var(--text);font-weight:700}
@@ -306,6 +309,11 @@ textarea.input{min-height:64px;resize:vertical}
 
 <div class="wrap">
   <div class="chips" id="chips" role="tablist" aria-label="家族の切り替え"></div>
+  <div class="addrow" id="addRow" hidden>
+    <input class="input" id="newName" type="text" placeholder="名前を入力" autocomplete="off" aria-label="追加する家族の名前">
+    <button class="btn sm" id="btnAddMember">追加</button>
+    <button class="btn ghost sm" id="btnAddCancel">やめる</button>
+  </div>
 
   <!-- ===== 救急カード ===== -->
   <div class="section active" id="sec-card">
@@ -529,9 +537,11 @@ function newMember(){
   return m;
 }
 function liveMembers(){ return state.members.filter(m => !m.deleted); }
+/* 名前がまだ無い枠はタブに出さない */
+function displayMembers(){ return liveMembers().filter(m => !isUntouched(m)); }
 function cur(){
   const live = liveMembers();
-  return live.find(m => m.id === curId) || live[0] || state.members[0];
+  return live.find(m => m.id === curId) || displayMembers()[0] || live[0] || state.members[0];
 }
 function touch(){
   const m = cur();
@@ -578,11 +588,38 @@ function nonEmpty(obj, keys){
 /* ===================== メンバータブ ===================== */
 function renderChips(){
   const el = document.getElementById('chips');
-  const html = liveMembers().map(m => {
-    const label = String(m.basic.name || '').trim() || '名前を入力';
+  const list = displayMembers();
+  const html = list.map(m => {
+    const label = String(m.basic.name || '').trim();
     return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
   }).join('');
   el.innerHTML = html + '<button class="chip add" id="chipAdd" aria-label="家族を追加">＋ 家族を追加</button>';
+
+  /* まだ誰も登録がないときは、名前の入力欄を最初から出しておく */
+  const row = document.getElementById('addRow');
+  if(!list.length){
+    row.hidden = false;
+    document.getElementById('btnAddCancel').hidden = true;
+  }else{
+    document.getElementById('btnAddCancel').hidden = false;
+  }
+}
+
+function addMember(){
+  const input = document.getElementById('newName');
+  const name = input.value.trim();
+  if(!name){ showToast('名前を入れてください'); input.focus(); return; }
+  let m = liveMembers().find(x => isUntouched(x));
+  if(!m){ m = newMember(); state.members.push(m); }
+  m.basic.name = name;
+  m.updatedAt = formatDate();
+  curId = m.id;
+  save();
+  input.value = '';
+  document.getElementById('addRow').hidden = true;
+  renderAll();
+  showToast('「'+name+'」を追加しました');
+  syncNow(true);
 }
 
 /* ===================== 救急カード ===================== */
@@ -600,11 +637,13 @@ function renderCard(){
   if(age(b.birth)) meta.push('<b>'+age(b.birth)+'</b>');
   if(b.sex) meta.push(esc(b.sex));
   if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
-  const named = !!String(b.name || '').trim();
-  h += '<p class="pname'+(named?'':' empty')+'" data-editname tabindex="0" role="button" aria-label="'+
-       (named ? '内容を編集する' : '名前を入力する')+'">'+
-       (named ? esc(b.name) + '<span class="editmark">✏️</span>'
-              : '＋ 名前を入力')+'</p>';
+  if(!displayMembers().length){
+    el.innerHTML = '<p class="emptycard">上の「名前を入力」に家族の名前を入れて、<br>「追加」を押すとはじめられます。</p>';
+    return;
+  }
+
+  h += '<p class="pname" data-editname tabindex="0" role="button" aria-label="内容を編集する">'+
+       esc(b.name)+'<span class="editmark">✏️</span></p>';
   if(b.kana) h += '<p class="pmeta">'+esc(b.kana)+'</p>';
   h += '<p class="pmeta">'+meta.join(' ・ ')+'</p>';
   if(b.birth) h += '<p class="pmeta">生年月日 '+esc(jpDate(b.birth))+'</p>';
@@ -1066,16 +1105,23 @@ function renderEditor(){
 document.getElementById('chips').addEventListener('click', e => {
   const add = e.target.closest('#chipAdd');
   if(add){
-    const m = newMember();
-    state.members.push(m);
-    curId = m.id;
-    save(); renderAll(); showSection('sec-edit');
-    showToast('家族を追加しました。氏名を入力してください');
+    const row = document.getElementById('addRow');
+    row.hidden = false;
+    document.getElementById('newName').focus();
     return;
   }
   const chip = e.target.closest('.chip[data-mid]');
   if(chip){ curId = chip.dataset.mid; renderAll(); }
 });
+
+document.getElementById('btnAddMember').onclick = addMember;
+document.getElementById('newName').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); addMember(); }
+});
+document.getElementById('btnAddCancel').onclick = () => {
+  document.getElementById('newName').value = '';
+  document.getElementById('addRow').hidden = true;
+};
 
 document.getElementById('editor').addEventListener('input', onEdit);
 document.getElementById('editor').addEventListener('change', onEdit);
