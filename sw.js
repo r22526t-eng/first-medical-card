@@ -1,5 +1,5 @@
 /* 家族の医療カード — オフライン用サービスワーカー */
-const CACHE = 'famcard-v12';
+const CACHE = 'famcard-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -36,9 +36,11 @@ self.addEventListener('fetch', e => {
                  (req.headers.get('accept') || '').indexOf('text/html') >= 0;
 
   if(isPage){
-    /* アプリ本体は通信優先。更新があればその場で反映し、圏外ならキャッシュを使う */
+    /* アプリ本体は通信優先。ブラウザの保持期間を無視して必ず最新を取りに行き、
+       圏外のときだけキャッシュを使う */
+    const fresh = new Request(req.url, { cache: 'reload', credentials: 'same-origin' });
     e.respondWith(
-      fetch(req).then(res => {
+      fetch(fresh).then(res => {
         if(res && res.status === 200){
           const copy = res.clone();
           caches.open(CACHE).then(c => c.put('./index.html', copy));
