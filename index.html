@@ -322,6 +322,19 @@ textarea.input{min-height:64px;resize:vertical}
     <div class="card" id="card" aria-live="polite"></div>
   </div>
 
+  <!-- ===== 招待リンクからの参加 ===== -->
+  <div class="section" id="sec-join">
+    <div class="card newcard">
+      <h2 class="newtitle">家族の共有に参加しますか？</h2>
+      <p class="newlead">
+        参加すると、ご家族が登録した内容がこの端末にも表示されます。<br>
+        この端末で入力した内容も、ご家族に共有されます。
+      </p>
+      <button class="btn" id="btnJoinYes" style="width:100%">参加する</button>
+      <button class="btn ghost sm" id="btnJoinNo" style="width:100%;margin-top:8px">やめておく</button>
+    </div>
+  </div>
+
   <!-- ===== 名前の登録 ===== -->
   <div class="section" id="sec-new">
     <div class="card newcard">
@@ -1437,23 +1450,34 @@ document.getElementById('btnInvite').onclick = async () => {
   }
 };
 
-/* 招待リンクで開かれたとき */
+/* 招待リンクで開かれたとき（画面のボタンで参加を選んでもらう） */
+let pendingJoin = '';
 function handleJoinLink(){
   const mt = /[?&]join=([^&]*)/.exec(location.search);
   if(!mt) return false;
   const code = decodeURIComponent(mt[1] || '').trim();
-  history.replaceState(null, '', location.pathname);
+  try{ history.replaceState(null, '', location.pathname); }catch(e){}
   if(!code) return false;
   if(code === syncPass){ showToast('すでに家族と共有しています'); return false; }
-  if(!confirm('家族の共有に参加しますか？\n\n参加すると、家族が登録した内容がこの端末にも表示され、この端末の入力も家族に共有されます。')){
-    return false;
-  }
-  syncPass = code;
-  lsSet(PASS_KEY, code);
-  renderSyncUI();
-  syncNow(false);
+  pendingJoin = code;
+  showSection('sec-join');
   return true;
 }
+
+document.getElementById('btnJoinYes').onclick = () => {
+  if(!pendingJoin) return;
+  syncPass = pendingJoin;
+  pendingJoin = '';
+  lsSet(PASS_KEY, syncPass);
+  renderSyncUI();
+  showSection('sec-card');
+  syncNow(false);
+};
+document.getElementById('btnJoinNo').onclick = () => {
+  pendingJoin = '';
+  if(displayMembers().length) showSection('sec-card');
+  else openAddScreen();
+};
 
 document.getElementById('btnSync').onclick = () => syncNow(false);
 window.addEventListener('online', () => syncNow(true));
