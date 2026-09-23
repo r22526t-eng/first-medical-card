@@ -84,9 +84,10 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
 }
 .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
 .chip.add{border-style:dashed;color:var(--primary);font-weight:700}
-.addrow{display:flex;gap:8px;align-items:center;margin:8px 0 0}
-.addrow[hidden]{display:none}
-.addrow .input{flex:1;min-width:0}
+.chips[hidden]{display:none}
+.addrow{display:flex;gap:8px;align-items:center;margin:12px 0 0}
+.addrow .input{flex:1;min-width:0;padding:8px 14px}
+.addrow .chip.add{flex:0 0 auto;cursor:pointer}
 
 /* ===== ツールバー ===== */
 .toolbar{display:flex;gap:8px;margin:10px 0 16px;flex-wrap:wrap}
@@ -309,10 +310,9 @@ textarea.input{min-height:64px;resize:vertical}
 
 <div class="wrap">
   <div class="chips" id="chips" role="tablist" aria-label="家族の切り替え"></div>
-  <div class="addrow" id="addRow" hidden>
+  <div class="addrow" id="addRow">
     <input class="input" id="newName" type="text" placeholder="名前を入力" autocomplete="off" aria-label="追加する家族の名前">
-    <button class="btn sm" id="btnAddMember">追加</button>
-    <button class="btn ghost sm" id="btnAddCancel">やめる</button>
+    <button class="chip add" id="btnAddMember">＋ 名前を追加</button>
   </div>
 
   <!-- ===== 救急カード ===== -->
@@ -593,16 +593,8 @@ function renderChips(){
     const label = String(m.basic.name || '').trim();
     return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
   }).join('');
-  el.innerHTML = html + '<button class="chip add" id="chipAdd" aria-label="家族を追加">＋ 家族を追加</button>';
-
-  /* まだ誰も登録がないときは、名前の入力欄を最初から出しておく */
-  const row = document.getElementById('addRow');
-  if(!list.length){
-    row.hidden = false;
-    document.getElementById('btnAddCancel').hidden = true;
-  }else{
-    document.getElementById('btnAddCancel').hidden = false;
-  }
+  el.innerHTML = html;
+  el.hidden = !list.length;
 }
 
 function addMember(){
@@ -616,7 +608,6 @@ function addMember(){
   curId = m.id;
   save();
   input.value = '';
-  document.getElementById('addRow').hidden = true;
   renderAll();
   showToast('「'+name+'」を追加しました');
   syncNow(true);
@@ -638,7 +629,7 @@ function renderCard(){
   if(b.sex) meta.push(esc(b.sex));
   if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
   if(!displayMembers().length){
-    el.innerHTML = '<p class="emptycard">上の「名前を入力」に家族の名前を入れて、<br>「追加」を押すとはじめられます。</p>';
+    el.innerHTML = '<p class="emptycard">上の欄に名前を入れて、<br>「＋ 名前を追加」を押すとはじめられます。</p>';
     return;
   }
 
@@ -1103,13 +1094,6 @@ function renderEditor(){
 
 /* ===================== イベント ===================== */
 document.getElementById('chips').addEventListener('click', e => {
-  const add = e.target.closest('#chipAdd');
-  if(add){
-    const row = document.getElementById('addRow');
-    row.hidden = false;
-    document.getElementById('newName').focus();
-    return;
-  }
   const chip = e.target.closest('.chip[data-mid]');
   if(chip){ curId = chip.dataset.mid; renderAll(); }
 });
@@ -1118,10 +1102,6 @@ document.getElementById('btnAddMember').onclick = addMember;
 document.getElementById('newName').addEventListener('keydown', e => {
   if(e.key === 'Enter'){ e.preventDefault(); addMember(); }
 });
-document.getElementById('btnAddCancel').onclick = () => {
-  document.getElementById('newName').value = '';
-  document.getElementById('addRow').hidden = true;
-};
 
 document.getElementById('editor').addEventListener('input', onEdit);
 document.getElementById('editor').addEventListener('change', onEdit);
