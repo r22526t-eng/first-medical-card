@@ -302,7 +302,7 @@ textarea.input{min-height:64px;resize:vertical}
 </div>
 
 <div class="pbanner" id="syncPrompt" hidden>
-  <span>この端末の入力は、まだ家族と共有されていません。<b>合言葉を入れると、他の端末からも見られるようになります。</b></span>
+  <span>この端末の入力は、まだ家族と共有されていません。<b>共有すると、他の端末からも見られるようになります。</b></span>
   <span class="pbtns">
     <button class="btn sm" id="btnPromptSet">設定する</button>
     <button class="btn ghost sm" id="btnPromptLater">あとで</button>
@@ -349,6 +349,9 @@ textarea.input{min-height:64px;resize:vertical}
         <div class="toolbar" style="margin:10px 0 0">
           <button class="btn sm" id="btnSyncOn">この端末で共有をはじめる</button>
           <button class="btn danger sm" id="btnSyncOff" hidden>共有をやめる</button>
+        </div>
+        <div class="toolbar" style="margin:0" id="inviteBox" hidden>
+          <button class="btn grow" id="btnInvite">📨 家族を招待する（リンクを送る）</button>
         </div>
         <p class="hint" id="syncInfo">同じ合言葉を入れた家族の端末どうしで、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。</p>
       </div>
@@ -1379,6 +1382,7 @@ function renderSyncUI(){
   const on = !!syncPass;
   document.getElementById('btnSync').hidden = !on;
   document.getElementById('btnSyncOff').hidden = !on;
+  document.getElementById('inviteBox').hidden = !on;
   document.getElementById('btnSyncOn').textContent = on ? '合言葉を入れ直す' : 'この端末で共有をはじめる';
   document.getElementById('passInput').value = syncPass;
   const badge = document.getElementById('syncBadge');
@@ -1388,8 +1392,9 @@ function renderSyncUI(){
   const at = lsGet(SYNCAT_KEY);
   document.getElementById('syncInfo').innerHTML = on
     ? '共有中です。' + (at ? '最終同期：' + esc(at) : 'まだ同期していません') +
-      '<br>同じ合言葉を入れた家族の端末と、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。'
-    : '同じ合言葉を入れた家族の端末どうしで、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。';
+      '<br><b>家族を増やすときは「📨 家族を招待する」</b>を押して、出てきたリンクをLINEなどで送ってください。相手はそのリンクを開くだけで参加できます。' +
+      '<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。'
+    : '家族から届いた<b>招待リンクを開くだけ</b>で共有に参加できます。<br>合言葉をお持ちの場合は、上の欄に入れて「この端末で共有をはじめる」を押してください。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。';
 }
 
 document.getElementById('btnSyncOn').onclick = async () => {
@@ -1409,6 +1414,46 @@ document.getElementById('btnSyncOff').onclick = () => {
   renderSyncUI();
   showToast('共有をやめました');
 };
+
+/* 招待リンク：これを開くだけで家族は共有に参加できる */
+function joinUrl(){
+  return location.origin + location.pathname + '?join=' + encodeURIComponent(syncPass);
+}
+
+document.getElementById('btnInvite').onclick = async () => {
+  const url = joinUrl();
+  const text = '家族の医療カードです。このリンクを開くと、同じ内容を見られるようになります。';
+  try{
+    if(navigator.share){
+      await navigator.share({ title: '家族の医療カード', text: text, url: url });
+      return;
+    }
+  }catch(e){ if(e && e.name === 'AbortError') return; }
+  try{
+    await navigator.clipboard.writeText(url);
+    showToast('招待リンクをコピーしました。LINEなどに貼って送ってください', 4000);
+  }catch(e){
+    prompt('このリンクを家族に送ってください', url);
+  }
+};
+
+/* 招待リンクで開かれたとき */
+function handleJoinLink(){
+  const mt = /[?&]join=([^&]*)/.exec(location.search);
+  if(!mt) return false;
+  const code = decodeURIComponent(mt[1] || '').trim();
+  history.replaceState(null, '', location.pathname);
+  if(!code) return false;
+  if(code === syncPass){ showToast('すでに家族と共有しています'); return false; }
+  if(!confirm('家族の共有に参加しますか？\n\n参加すると、家族が登録した内容がこの端末にも表示され、この端末の入力も家族に共有されます。')){
+    return false;
+  }
+  syncPass = code;
+  lsSet(PASS_KEY, code);
+  renderSyncUI();
+  syncNow(false);
+  return true;
+}
 
 document.getElementById('btnSync').onclick = () => syncNow(false);
 window.addEventListener('online', () => syncNow(true));
@@ -1439,7 +1484,8 @@ renderAll();
 renderSyncUI();
 renderSyncPrompt();
 if(!displayMembers().length) openAddScreen();
-if(syncPass) syncNow(true);
+const joinedNow = handleJoinLink();
+if(syncPass && !joinedNow) syncNow(true);
 
 /* オフラインでも開けるようにする（ホーム画面アプリ用） */
 if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
