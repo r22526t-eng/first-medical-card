@@ -85,9 +85,10 @@ header p{margin:2px 0 0;font-size:.72rem;opacity:.85}
 .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
 .chip.add{border-style:dashed;color:var(--primary);font-weight:700}
 .chips[hidden]{display:none}
-.addrow{display:flex;gap:8px;align-items:center;margin:12px 0 0}
-.addrow .input{flex:1;min-width:0;padding:8px 14px}
-.addrow .chip.add{flex:0 0 auto;cursor:pointer}
+.newcard{margin-top:12px;text-align:center}
+.newtitle{margin:0;font-size:1.15rem;font-weight:900}
+.newlead{margin:6px 0 16px;font-size:.86rem;color:var(--text-muted)}
+.newname{font-size:1.15rem;text-align:center;padding:14px 12px}
 
 /* ===== ツールバー ===== */
 .toolbar{display:flex;gap:8px;margin:10px 0 16px;flex-wrap:wrap}
@@ -310,10 +311,6 @@ textarea.input{min-height:64px;resize:vertical}
 
 <div class="wrap">
   <div class="chips" id="chips" role="tablist" aria-label="家族の切り替え"></div>
-  <div class="addrow" id="addRow">
-    <input class="input" id="newName" type="text" placeholder="名前を入力" autocomplete="off" aria-label="追加する家族の名前">
-    <button class="chip add" id="btnAddMember">＋ 名前を追加</button>
-  </div>
 
   <!-- ===== 救急カード ===== -->
   <div class="section active" id="sec-card">
@@ -323,6 +320,17 @@ textarea.input{min-height:64px;resize:vertical}
       <button class="btn ghost sm" id="btnSync" hidden>🔄 同期</button>
     </div>
     <div class="card" id="card" aria-live="polite"></div>
+  </div>
+
+  <!-- ===== 名前の登録 ===== -->
+  <div class="section" id="sec-new">
+    <div class="card newcard">
+      <h2 class="newtitle">家族を追加</h2>
+      <p class="newlead">登録する方のお名前を入れてください。</p>
+      <input class="input newname" id="newName" type="text" placeholder="例）田中 一郎" autocomplete="off" aria-label="追加する家族の名前">
+      <button class="btn grow" id="btnAddMember" style="width:100%;margin-top:14px">この名前で追加する</button>
+      <button class="btn ghost sm" id="btnAddBack" style="width:100%;margin-top:8px">もどる</button>
+    </div>
   </div>
 
   <!-- ===== 編集 ===== -->
@@ -593,8 +601,15 @@ function renderChips(){
     const label = String(m.basic.name || '').trim();
     return '<button class="chip'+(m.id===curId?' active':'')+'" role="tab" aria-selected="'+(m.id===curId)+'" data-mid="'+esc(m.id)+'">'+esc(label)+'</button>';
   }).join('');
-  el.innerHTML = html;
-  el.hidden = !list.length;
+  el.innerHTML = html + '<button class="chip add" id="chipAdd" aria-label="名前を追加する">＋ 名前を追加</button>';
+}
+
+function openAddScreen(){
+  const input = document.getElementById('newName');
+  input.value = '';
+  document.getElementById('btnAddBack').hidden = !displayMembers().length;
+  showSection('sec-new');
+  input.focus();
 }
 
 function addMember(){
@@ -609,6 +624,7 @@ function addMember(){
   save();
   input.value = '';
   renderAll();
+  showSection('sec-card');
   showToast('「'+name+'」を追加しました');
   syncNow(true);
 }
@@ -629,7 +645,7 @@ function renderCard(){
   if(b.sex) meta.push(esc(b.sex));
   if(b.blood) meta.push('血液型 <b>'+esc(b.blood)+'</b>');
   if(!displayMembers().length){
-    el.innerHTML = '<p class="emptycard">上の欄に名前を入れて、<br>「＋ 名前を追加」を押すとはじめられます。</p>';
+    el.innerHTML = '<p class="emptycard">「＋ 名前を追加」から、<br>ご家族の名前を登録してください。</p>';
     return;
   }
 
@@ -1094,6 +1110,7 @@ function renderEditor(){
 
 /* ===================== イベント ===================== */
 document.getElementById('chips').addEventListener('click', e => {
+  if(e.target.closest('#chipAdd')){ openAddScreen(); return; }
   const chip = e.target.closest('.chip[data-mid]');
   if(chip){ curId = chip.dataset.mid; renderAll(); }
 });
@@ -1102,6 +1119,7 @@ document.getElementById('btnAddMember').onclick = addMember;
 document.getElementById('newName').addEventListener('keydown', e => {
   if(e.key === 'Enter'){ e.preventDefault(); addMember(); }
 });
+document.getElementById('btnAddBack').onclick = () => showSection('sec-card');
 
 document.getElementById('editor').addEventListener('input', onEdit);
 document.getElementById('editor').addEventListener('change', onEdit);
@@ -1420,6 +1438,7 @@ if(!storageOK) document.getElementById('storageWarn').hidden = false;
 renderAll();
 renderSyncUI();
 renderSyncPrompt();
+if(!displayMembers().length) openAddScreen();
 if(syncPass) syncNow(true);
 
 /* オフラインでも開けるようにする（ホーム画面アプリ用） */
