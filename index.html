@@ -1476,7 +1476,8 @@ document.getElementById('btnSyncOff').onclick = () => {
 
 /* 招待リンク：これを開くだけで家族は共有に参加できる */
 function joinUrl(){
-  return location.origin + location.pathname + '?join=' + encodeURIComponent(syncPass);
+  /* ＃以降はオフライン用の仕組みを通らないため、確実に相手の端末まで届く */
+  return location.origin + location.pathname + '#join=' + encodeURIComponent(syncPass);
 }
 
 document.getElementById('btnInvite').onclick = async () => {
@@ -1499,7 +1500,7 @@ document.getElementById('btnInvite').onclick = async () => {
 /* 招待リンクで開かれたとき（画面のボタンで参加を選んでもらう） */
 let pendingJoin = '';
 function handleJoinLink(){
-  const mt = /[?&]join=([^&]*)/.exec(location.search);
+  const mt = /[#?&]join=([^&]*)/.exec(location.hash) || /[?&]join=([^&]*)/.exec(location.search);
   if(!mt) return false;
   const code = decodeURIComponent(mt[1] || '').trim();
   try{ history.replaceState(null, '', location.pathname); }catch(e){}
