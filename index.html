@@ -202,6 +202,13 @@ a.tel{color:var(--primary-dark);font-weight:900;text-decoration:none;border-bott
   cursor:pointer;font-family:inherit;
 }
 .hint{font-size:.74rem;color:var(--text-muted);margin:8px 0 0;line-height:1.5}
+.manualjoin{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px}
+.manualjoin>summary{font-size:.76rem;color:var(--text-muted);cursor:pointer;font-weight:700}
+.passnote{
+  margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:9px;
+  padding:9px 12px;font-size:.76rem;color:var(--text-muted);line-height:1.6;
+}
+.passnote b{font-size:.95rem;color:var(--text);letter-spacing:.04em}
 .lightbox{
   position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9998;
   display:flex;align-items:center;justify-content:center;padding:12px;cursor:zoom-out;
@@ -355,17 +362,25 @@ textarea.input{min-height:64px;resize:vertical}
     <details class="acc" id="syncBox">
       <summary>☁️ 家族と共有<span class="cnt zero" id="syncBadge">未設定</span></summary>
       <div class="accbody">
-        <div class="f full">
-          <label for="passInput">家族の合言葉</label>
-          <input class="input" id="passInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="例）nada-0000-0000">
-        </div>
-        <div class="toolbar" style="margin:10px 0 0">
-          <button class="btn sm" id="btnSyncOn">この端末で共有をはじめる</button>
-          <button class="btn danger sm" id="btnSyncOff" hidden>共有をやめる</button>
+        <div class="toolbar" style="margin:0" id="startBox">
+          <button class="btn grow" id="btnSyncStart">🔗 この端末で共有をはじめる</button>
         </div>
         <div class="toolbar" style="margin:0" id="inviteBox" hidden>
           <button class="btn grow" id="btnInvite">📨 家族を招待する（リンクを送る）</button>
         </div>
+        <div class="toolbar" style="margin:8px 0 0">
+          <button class="btn danger sm" id="btnSyncOff" hidden>共有をやめる</button>
+        </div>
+        <details class="manualjoin" id="manualJoin">
+          <summary>リンクが開けないとき（合言葉を直接入れる）</summary>
+          <div class="f full" style="margin-top:8px">
+            <label for="passInput">家族の合言葉</label>
+            <input class="input" id="passInput" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="例）nada-0000-0000">
+          </div>
+          <div class="toolbar" style="margin:8px 0 0">
+            <button class="btn sm" id="btnSyncOn">この端末で共有をはじめる</button>
+          </div>
+        </details>
         <p class="hint" id="syncInfo">同じ合言葉を入れた家族の端末どうしで、カードの内容が共有されます。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。</p>
       </div>
     </details>
@@ -1396,7 +1411,8 @@ function renderSyncUI(){
   document.getElementById('btnSync').hidden = !on;
   document.getElementById('btnSyncOff').hidden = !on;
   document.getElementById('inviteBox').hidden = !on;
-  document.getElementById('btnSyncOn').textContent = on ? '合言葉を入れ直す' : 'この端末で共有をはじめる';
+  document.getElementById('startBox').hidden = on;
+  document.getElementById('manualJoin').hidden = on;
   document.getElementById('passInput').value = syncPass;
   const badge = document.getElementById('syncBadge');
   badge.textContent = on ? '共有中' : '未設定';
@@ -1405,10 +1421,40 @@ function renderSyncUI(){
   const at = lsGet(SYNCAT_KEY);
   document.getElementById('syncInfo').innerHTML = on
     ? '共有中です。' + (at ? '最終同期：' + esc(at) : 'まだ同期していません') +
-      '<br><b>家族を増やすときは「📨 家族を招待する」</b>を押して、出てきたリンクをLINEなどで送ってください。相手はそのリンクを開くだけで参加できます。' +
-      '<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。'
-    : '家族から届いた<b>招待リンクを開くだけ</b>で共有に参加できます。<br>合言葉をお持ちの場合は、上の欄に入れて「この端末で共有をはじめる」を押してください。<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。';
+      '<br>家族を増やすときは上のボタンを押し、出てきたリンクをLINEなどで送ってください。相手はそのリンクを開くだけで参加できます。' +
+      '<br>※お薬手帳の写真は共有されず、撮った端末にだけ残ります。' +
+      '<div class="passnote">この共有の合言葉：<b>' + esc(syncPass) + '</b><br>' +
+      'ふだんは使いません。すべての端末のデータが消えたときに、サーバー上の内容へ戻すための控えです。念のためメモに残しておくと安心です。</div>'
+    : '<b>家族から招待リンクが届いている場合は、そのリンクを開いてください。</b>この画面での操作は要りません。<br>' +
+      'まだ誰も共有していない場合は、上のボタンで共有をはじめられます。合言葉はアプリが自動で作るので、覚える必要はありません。<br>' +
+      '※お薬手帳の写真は共有されず、撮った端末にだけ残ります。';
 }
+
+/* 合言葉はアプリが自動で作る。利用者は覚える必要も打ち込む必要もない */
+function makeCode(){
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let out = '';
+  const buf = new Uint8Array(16);
+  (window.crypto || window.msCrypto).getRandomValues(buf);
+  for(let i = 0; i < buf.length; i++){
+    out += chars[buf[i] % chars.length];
+    if(i === 3 || i === 9) out += '-';
+  }
+  return 'fam-' + out;
+}
+
+document.getElementById('btnSyncStart').onclick = async () => {
+  if(!confirm('この端末の内容をもとに、家族との共有をはじめます。\n\n※すでにご家族の誰かが共有を始めている場合は、こちらではなく、その方から届いた招待リンクを開いてください。')) return;
+  syncPass = makeCode();
+  const ok = await syncNow(false);
+  if(ok){
+    lsSet(PASS_KEY, syncPass);
+    showToast('共有をはじめました。「家族を招待する」でリンクを送ってください', 4000);
+  }else{
+    syncPass = '';
+  }
+  renderSyncUI();
+};
 
 document.getElementById('btnSyncOn').onclick = async () => {
   const v = document.getElementById('passInput').value.trim();
@@ -1493,7 +1539,6 @@ document.getElementById('btnPromptSet').onclick = () => {
   const box = document.getElementById('syncBox');
   box.open = true;
   box.scrollIntoView({ block: 'center' });
-  document.getElementById('passInput').focus();
 };
 document.getElementById('btnPromptLater').onclick = () => {
   lsSet(PROMPT_KEY, '1');
